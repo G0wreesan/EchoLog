@@ -14,6 +14,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.echolog.app.ui.theme.EchoLogTheme
 import dagger.hilt.android.AndroidEntryPoint
 
+import com.echolog.app.ui.MainAppShell
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,6 +28,8 @@ class MainActivity : ComponentActivity() {
                         name = "EchoLog User",
                         modifier = Modifier.padding(innerPadding)
                     )
+
+                    MainAppShell()
                 }
             }
         }
