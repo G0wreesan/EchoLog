@@ -10,109 +10,143 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.echolog.app.viewmodel.RegistrationViewModel
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 
 @Composable
 fun LoginScreen(
-    viewModel: RegistrationViewModel, // Add the ViewModel here
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onContinueAsGuest: () -> Unit
+    onContinueAsGuest: () -> Unit,
+    viewModel: RegistrationViewModel
 ) {
-    // Collect states from ViewModel
-    val email by viewModel.email.collectAsState()
-    val password by viewModel.password.collectAsState()
-    val isChecking by viewModel.isChecking.collectAsState()
-    val authError by viewModel.authError.collectAsState()
+    var identifier by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(60.dp))
 
-        Text("EchoLog", fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Text("Your personal vault.", color = Color.Gray) // Updated vibe
+        Spacer(modifier = Modifier.height(80.dp))
 
-        Spacer(modifier = Modifier.height(48.dp))
-
-        // Email Field
-        OutlinedTextField(
-            value = email,
-            onValueChange = { viewModel.onEmailChange(it) },
-            label = { Text("Email Address") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = authError != null
+        // App Title
+        Text(
+            text = "EchoLog",
+            fontSize = 36.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Password Field
-        OutlinedTextField(
-            value = password,
-            onValueChange = { viewModel.onPasswordChange(it) },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = authError != null
+        Text(
+            text = "Sign in to continue",
+            color = Color.Gray,
+            fontSize = 14.sp
         )
 
-        // Error Message Display
-        if (authError != null) {
-            Text(
-                text = authError!!,
-                color = Color.Red,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 8.dp).align(Alignment.Start)
-            )
-        }
+        Spacer(modifier = Modifier.height(40.dp))
 
-        TextButton(
-            onClick = { /* Handle Forgot Password later */ },
-            modifier = Modifier.align(Alignment.End)
+        // Card Container (modern touch)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(6.dp)
         ) {
-            Text("Forgot Password?", color = Color.Gray)
-        }
+            Column(modifier = Modifier.padding(20.dp)) {
 
-        Spacer(modifier = Modifier.height(24.dp))
+                OutlinedTextField(
+                    value = identifier,
+                    onValueChange = { identifier = it },
+                    label = { Text("Email or Username") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-        // Login Button
-        Button(
-            onClick = { viewModel.signIn(onSuccess = onLoginSuccess) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            enabled = !isChecking && email.isNotEmpty() && password.isNotEmpty(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
-        ) {
-            if (isChecking) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-            } else {
-                Text("Login")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                TextButton(
+                    onClick = { },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Forgot Password?")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onLoginSuccess,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Login")
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Guest Access
+        // Divider with OR
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Divider(modifier = Modifier.weight(1f))
+            Text("  OR  ", color = Color.Gray)
+            Divider(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Guest Button
         OutlinedButton(
             onClick = onContinueAsGuest,
-            modifier = Modifier.fillMaxWidth().height(50.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Continue as Guest", color = Color.Black)
+            Text("Continue as Guest")
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Row {
-            Text("New user? ")
-            TextButton(onClick = onNavigateToRegister, contentPadding = PaddingValues(0.dp)) {
-                Text("Register here", fontWeight = FontWeight.Bold, color = Color.Black)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Don’t have an account?",
+                fontSize = 13.sp
+            )
+
+            TextButton(
+                onClick = onNavigateToRegister,
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    "Register",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }

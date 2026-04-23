@@ -8,43 +8,50 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import coil3.compose.rememberAsyncImagePainter
 import com.echolog.app.viewmodel.LogViewModel
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateLogScreen(viewModel: LogViewModel, onSaveSuccess: () -> Unit) {
+fun CreateLogScreen(
+    viewModel: LogViewModel,
+    onSaveSuccess: () -> Unit
+) {
     val context = LocalContext.current
-    var title by remember { mutableStateOf("") }
-    var caption by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("General") }
-    var selectedColor by remember { mutableStateOf(Color.Black) }
-    var scheduledAt by remember { mutableStateOf<Long?>(null) }
 
+    // UI State
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val categories = listOf("Study", "Work", "Workout", "Personal", "Travel", "General")
+    var selectedCategory by remember { mutableStateOf(categories[0]) }
+    var expanded by remember { mutableStateOf(false) }
+
+    // Media Logic State
     val selectedMediaPaths = remember { mutableStateListOf<String>() }
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Helper to generate camera URI
+    // --- FUNCTIONAL LOGIC (From Your Code) ---
     fun getTempUri(): Uri {
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "temp_${System.currentTimeMillis()}.jpg")
         return FileProvider.getUriForFile(context, "com.echolog.app.fileprovider", file)
     }
 
-    // Launchers
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { selectedMediaPaths.add(it.toString()) }
     }
@@ -53,45 +60,76 @@ fun CreateLogScreen(viewModel: LogViewModel, onSaveSuccess: () -> Unit) {
         if (success) tempPhotoUri?.let { selectedMediaPaths.add(it.toString()) }
     }
 
-    // PERMISSION CHECKER
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        val canCamera = perms[Manifest.permission.CAMERA] ?: false
-        val canAudio = perms[Manifest.permission.RECORD_AUDIO] ?: false
-
-        if (!canCamera) Toast.makeText(context, "Camera permission required", Toast.LENGTH_SHORT).show()
+        if (perms[Manifest.permission.CAMERA] == false) {
+            Toast.makeText(context, "Camera permission required", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
-        Text("New Log", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(24.dp))
+    // --- UI LAYOUT (Friend's Style + Merged Features) ---
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF7F7F7))
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp)
+    ) {
+        Text(text = "Create Entry", style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(20.dp))
 
-        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Title") },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(value = caption, onValueChange = { caption = it }, label = { Text("Details") }, modifier = Modifier.fillMaxWidth().height(120.dp))
+
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Description") },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(140.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Dropdown from friend's code
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedCategory,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Category") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                modifier = Modifier.fillMaxWidth().menuAnchor()
+            )
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                categories.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(category) },
+                        onClick = { selectedCategory = category; expanded = false }
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Categories
-        Text("Category", fontWeight = FontWeight.SemiBold)
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
-            listOf("General", "Personal", "Work", "Ideas").forEach { cat ->
-                FilterChip(selected = selectedCategory == cat, onClick = { selectedCategory = cat }, label = { Text(cat) }, modifier = Modifier.padding(end = 8.dp))
-            }
-        }
-
-        // Colors
-        Text("Log Color", fontWeight = FontWeight.SemiBold)
-        Row(Modifier.padding(vertical = 8.dp)) {
-            listOf(Color.Black, Color.Red, Color.Blue, Color.Magenta, Color.DarkGray).forEach { color ->
-                Box(modifier = Modifier.size(36.dp).background(color, CircleShape).border(if (selectedColor == color) 3.dp else 0.dp, Color.LightGray, CircleShape).clickable { selectedColor = color })
-                Spacer(Modifier.width(12.dp))
-            }
-        }
-
-        // Media Controls
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        // Combined Media Section
+        Text(text = "Add Media", style = MaterialTheme.typography.titleMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             IconButton(onClick = {
                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                 val uri = getTempUri()
@@ -101,33 +139,53 @@ fun CreateLogScreen(viewModel: LogViewModel, onSaveSuccess: () -> Unit) {
 
             IconButton(onClick = {
                 permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-                // TODO: Start audio recording logic
+                // Audio Logic goes here
             }) { Icon(Icons.Default.Mic, "Voice") }
 
-            IconButton(onClick = { galleryLauncher.launch("image/*") }) { Icon(Icons.Default.Collections, "Gallery") }
+            IconButton(onClick = { galleryLauncher.launch("image/*") }) {
+                Icon(Icons.Default.Collections, "Gallery")
+            }
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        // --- NEW: Horizontal Media Preview ---
+        if (selectedMediaPaths.isNotEmpty()) {
+            LazyRow(modifier = Modifier.height(120.dp).fillMaxWidth()) {
+                items(selectedMediaPaths) { path ->
+                    Box(modifier = Modifier.padding(end = 8.dp)) {
+                        Image(
+                            painter = rememberAsyncImagePainter(path),
+                            contentDescription = null,
+                            modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        // Delete button for media
+                        IconButton(
+                            onClick = { selectedMediaPaths.remove(path) },
+                            modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(0.4f), CircleShape).size(24.dp)
+                        ) { Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(30.dp))
 
         Button(
             onClick = {
                 viewModel.saveNewLog(
                     title = title,
-                    caption = caption,
+                    caption = description,
                     category = selectedCategory,
                     type = "memory",
-                    mediaPaths = selectedMediaPaths.toList(),
-                    colorHex = String.format("#%06X", (0xFFFFFF and selectedColor.toArgb())),
-                    scheduledAt = scheduledAt,
-                    context = context // Passing context here!
+                    mediaPaths = selectedMediaPaths.toList()
                 )
                 onSaveSuccess()
             },
             modifier = Modifier.fillMaxWidth().height(55.dp),
             enabled = title.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = selectedColor)
+            shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Save to Vault", color = Color.White)
+            Text("Save Entry")
         }
     }
 }

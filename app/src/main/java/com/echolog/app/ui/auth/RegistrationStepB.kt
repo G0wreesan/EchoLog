@@ -2,9 +2,14 @@ package com.echolog.app.ui.auth
 
 import android.graphics.Bitmap
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,10 +24,6 @@ import androidx.compose.ui.unit.sp
 import com.echolog.app.R
 import com.echolog.app.viewmodel.RegistrationViewModel
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
-import androidx.compose.foundation.layout.size // For the progress indicator
-
 @Composable
 fun RegistrationStepB(
     viewModel: RegistrationViewModel,
@@ -36,9 +37,9 @@ fun RegistrationStepB(
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
-    ) { uri: android.net.Uri? ->
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
         uri?.let {
             val bitmap: Bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val source = android.graphics.ImageDecoder.createSource(context.contentResolver, it)
@@ -48,8 +49,8 @@ fun RegistrationStepB(
                 android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, it)
             }
 
-            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 512, 512, true)
-            viewModel.setCustomBitmap(scaledBitmap)
+            val scaled = Bitmap.createScaledBitmap(bitmap, 512, 512, true)
+            viewModel.setCustomBitmap(scaled)
         }
     }
 
@@ -62,57 +63,117 @@ fun RegistrationStepB(
     )
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("EchoLog", fontSize = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-        Text("STEP 2: APPEARANCE", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.align(Alignment.Start).padding(bottom = 24.dp))
 
+        Spacer(modifier = Modifier.height(50.dp))
+
+        Text(
+            "EchoLog",
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Text(
+            "STEP 2 • Choose your identity",
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(30.dp))
+
+        // ===== PROFILE PREVIEW CARD =====
         Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9F9))
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
                 Box(
-                    modifier = Modifier.size(60.dp).clip(CircleShape).background(Color.LightGray),
+                    modifier = Modifier
+                        .size(70.dp)
+                        .clip(CircleShape)
+                        .background(Color.LightGray),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (selectedBitmap != null) {
-                        Image(bitmap = selectedBitmap!!.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
-                    } else if (selectedRes != null) {
-                        Image(painter = painterResource(id = selectedRes!!), contentDescription = null, modifier = Modifier.fillMaxSize())
-                    } else {
-                        Icon(painter = painterResource(id = android.R.drawable.ic_menu_gallery), contentDescription = null, tint = Color.White)
+                    when {
+                        selectedBitmap != null ->
+                            Image(
+                                bitmap = selectedBitmap!!.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                        selectedRes != null ->
+                            Image(
+                                painter = painterResource(id = selectedRes!!),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                        else ->
+                            Icon(
+                                painter = painterResource(id = android.R.drawable.ic_menu_gallery),
+                                contentDescription = null,
+                                tint = Color.White
+                            )
                     }
                 }
 
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(displayName.ifEmpty { "Your Name" }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text(if (username.isEmpty()) "@username" else "@$username", color = Color.Gray, fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                    Text(
+                        text = displayName.ifEmpty { "Your Name" },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = if (username.isEmpty()) "@username" else "@$username",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Text("Select an Avatar", fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+        Spacer(modifier = Modifier.height(25.dp))
 
-        // FIXED: Added horizontal scroll for 14 avatars
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
-                .horizontalScroll(rememberScrollState()),
+        Text(
+            "Pick an Avatar",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ===== MODERN GRID AVATARS =====
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.height(260.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            defaultAvatars.forEach { resId ->
+            items(defaultAvatars.size) { index ->
+                val resId = defaultAvatars[index]
+
                 Image(
                     painter = painterResource(id = resId),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(70.dp)
                         .clip(CircleShape)
                         .border(
-                            width = 3.dp,
+                            width = 2.dp,
                             color = if (selectedRes == resId) Color.Black else Color.Transparent,
                             shape = CircleShape
                         )
@@ -121,27 +182,42 @@ fun RegistrationStepB(
             }
         }
 
-        Text("OR", color = Color.Gray, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            "OR",
+            color = Color.Gray,
+            fontSize = 12.sp
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedButton(
             onClick = { galleryLauncher.launch("image/*") },
-            modifier = Modifier.padding(top = 16.dp)
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
         ) {
-            Text("Upload from Device", color = Color.Black)
+            Text("Upload from Device")
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = onNext,
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
         ) {
-            Text("Next: Security")
+            Text("Continue")
         }
 
         TextButton(onClick = onBack) {
             Text("Back", color = Color.Gray)
         }
+
+        Spacer(modifier = Modifier.height(10.dp))
     }
 }
