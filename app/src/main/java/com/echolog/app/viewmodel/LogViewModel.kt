@@ -86,10 +86,15 @@ class LogViewModel @Inject constructor(
         type: String,
         mediaPaths: List<String>,
         colorHex: String = "#000000",
-        scheduledAt: Long? = null,
+        scheduledAt: Long? = null, // UI still gives us a Long
         context: Context
     ) {
         val userId = currentUserId ?: return
+
+        // Convert Long? to ISO String?
+        val isoScheduledAt = scheduledAt?.let {
+            java.time.Instant.ofEpochMilli(it).toString()
+        }
 
         viewModelScope.launch {
             val newLog = LogEntity(
@@ -99,9 +104,10 @@ class LogViewModel @Inject constructor(
                 category = category,
                 logType = type,
                 localMediaPaths = mediaPaths,
-                scheduledAt = scheduledAt,
-                colorHex = colorHex,
-                isSynced = false
+                scheduledAt = isoScheduledAt, // Matches new String? type
+                createdAt = java.time.Instant.now().toString(), // Matches new String type
+                isSynced = false,
+                colorHex = colorHex
             )
             repository.saveAndSyncLog(newLog, context)
         }

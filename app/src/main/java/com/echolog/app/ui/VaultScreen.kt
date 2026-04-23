@@ -27,6 +27,7 @@ import com.echolog.app.viewmodel.LogViewModel
 import com.echolog.app.viewmodel.RegistrationViewModel
 import java.util.*
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VaultScreen(
@@ -176,6 +177,7 @@ fun VaultScreen(
         VaultActionRow(Icons.Default.VerifiedUser, "Security & Privacy") {
             // Navigate to security settings
         }
+
 
         VaultActionRow(Icons.Default.HelpOutline, "Support") {
             showSupport = true

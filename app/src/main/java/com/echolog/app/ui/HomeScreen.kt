@@ -36,7 +36,18 @@ fun HomeScreen(viewModel: LogViewModel) {
             }
 
             // Section 1: Upcoming (Filtered logs)
-            val upcoming = logs.filter { it.scheduledAt != null && it.scheduledAt!! > System.currentTimeMillis() }
+            // Section 1: Upcoming (Filtered logs)
+            val upcoming = logs.filter { log ->
+                log.scheduledAt?.let { scheduledStr ->
+                    try {
+                        // Parse ISO-8601 string back to milliseconds
+                        val scheduledMillis = java.time.Instant.parse(scheduledStr).toEpochMilli()
+                        scheduledMillis > System.currentTimeMillis()
+                    } catch (e: Exception) {
+                        false
+                    }
+                } ?: false
+            }
             if (upcoming.isNotEmpty()) {
                 item {
                     Text(
