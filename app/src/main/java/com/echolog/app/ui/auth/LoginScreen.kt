@@ -94,14 +94,23 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                if (authError != null) {
+                    Text(authError!!, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                }
+
                 Button(
-                    onClick = onLoginSuccess,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
+                    onClick = {
+                        viewModel.loginWithEmail(identifier, password, onLoginSuccess)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    enabled = !isChecking && identifier.isNotEmpty() && password.isNotEmpty(),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Login")
+                    if (isChecking) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Login")
+                    }
                 }
             }
         }
