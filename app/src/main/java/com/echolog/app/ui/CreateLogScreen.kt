@@ -1,106 +1,189 @@
 package com.echolog.app.ui
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Collections
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import coil3.compose.rememberAsyncImagePainter
 import com.echolog.app.viewmodel.LogViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateLogScreen(
     viewModel: LogViewModel,
     onSaveSuccess: () -> Unit
 ) {
-    // Explicitly specifying <String> fixes the "Cannot infer type" error
-    var title by remember { mutableStateOf<String>("") }
-    var caption by remember { mutableStateOf<String>("") }
-    var selectedCategory by remember { mutableStateOf<String>("General") }
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+
+    val categories = listOf("Study", "Work", "Workout", "Personal", "Travel")
+    var selectedCategory by remember { mutableStateOf(categories[0]) }
+    var expanded by remember { mutableStateOf(false) }
+
+    // Media states
+    var imageUri by remember { mutableStateOf<String?>(null) }
+    var audioPath by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color(0xFFF7F7F7))
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp)
     ) {
+
         Text(
-            text = "New Log",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Start)
+            text = "Create Entry",
+            style = MaterialTheme.typography.headlineMedium
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
+        // Title
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
             label = { Text("Title") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Description
         OutlinedTextField(
-            value = caption,
-            onValueChange = { caption = it },
-            label = { Text("What's on your mind?") },
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Description") },
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
+                .height(140.dp)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Media Action Bar
+        // ✅ FIXED CATEGORY DROPDOWN
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+
+            OutlinedTextField(
+                value = selectedCategory,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Category") },
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor() // 🔥 REQUIRED
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                categories.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(category) },
+                        onClick = {
+                            selectedCategory = category
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Media Section
+        Text(
+            text = "Add Media",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            IconButton(onClick = { /* TODO: Open Camera */ }) {
+            IconButton(onClick = {
+                // TODO: Camera logic
+            }) {
                 Icon(Icons.Default.PhotoCamera, contentDescription = "Camera")
             }
-            IconButton(onClick = { /* TODO: Record Voice */ }) {
+
+            IconButton(onClick = {
+                // TODO: Voice recording logic
+            }) {
                 Icon(Icons.Default.Mic, contentDescription = "Voice")
             }
-            IconButton(onClick = { /* TODO: Pick Gallery */ }) {
+
+            IconButton(onClick = {
+                // TODO: Gallery picker
+            }) {
                 Icon(Icons.Default.Collections, contentDescription = "Gallery")
             }
         }
 
-        Spacer(modifier = Modifier.height(40.dp))
+        // Image Preview
+        imageUri?.let {
+            Spacer(modifier = Modifier.height(16.dp))
 
+            Image(
+                painter = rememberAsyncImagePainter(it),
+                contentDescription = "Selected Image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        // Audio Indicator
+        audioPath?.let {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("🎤 Voice recorded")
+        }
+
+        Spacer(modifier = Modifier.height(30.dp))
+
+        // Save Button
         Button(
             onClick = {
-                // Ensure this function exists in LogViewModel
                 viewModel.saveNewLog(
                     title = title,
-                    caption = caption,
+                    caption = description,
                     category = selectedCategory,
-                    type = "memory",
-                    mediaPaths = emptyList()
+                    type = selectedCategory,
+                    mediaPaths = listOfNotNull(imageUri, audioPath)
                 )
                 onSaveSuccess()
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(55.dp),
-            enabled = title.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            shape = RoundedCornerShape(14.dp)
         ) {
-            Text("Save to Vault", color = Color.White)
+            Text("Save Entry")
         }
     }
 }
