@@ -191,7 +191,7 @@ fun VaultScreen(
         ) {
             Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color.Red, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Logout Session", color = Color.Red, fontWeight = FontWeight.Bold)
+            Text("Logout", color = Color.Red, fontWeight = FontWeight.Bold)
         }
     }
 }

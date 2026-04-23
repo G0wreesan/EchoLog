@@ -10,8 +10,13 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
+<<<<<<< Updated upstream
 import java.util.UUID
 import kotlinx.datetime.Instant
+=======
+import kotlinx.serialization.Transient
+
+>>>>>>> Stashed changes
 
 @Entity(tableName = "logs")
 @Serializable
@@ -29,6 +34,12 @@ data class LogEntity(
     @SerialName("log_type")
     val logType: String,
 
+<<<<<<< Updated upstream
+=======
+    @Transient // Excluded from Supabase (Used kotlinx.serialization.Transient to avoid Room ignoring it)
+    val localMediaPaths: List<String> = emptyList(),
+
+>>>>>>> Stashed changes
     @SerialName("image_urls")
     val remoteMediaUrls: List<String> = emptyList(),
 
