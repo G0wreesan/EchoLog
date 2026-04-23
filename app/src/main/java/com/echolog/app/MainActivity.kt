@@ -4,17 +4,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.echolog.app.ui.theme.EchoLogTheme
-import dagger.hilt.android.AndroidEntryPoint
-
+import androidx.compose.animation.*
+import androidx.compose.runtime.*
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.echolog.app.ui.MainAppShell
+import com.echolog.app.ui.auth.*
+import com.echolog.app.ui.theme.EchoLogTheme
+import com.echolog.app.viewmodel.RegistrationViewModel
+import dagger.hilt.android.AndroidEntryPoint
+import androidx.activity.compose.BackHandler
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -23,31 +21,74 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             EchoLogTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "EchoLog User",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                var currentFlow by remember { mutableStateOf("LOGIN") }
+                val registrationViewModel: RegistrationViewModel = hiltViewModel()
 
-                    MainAppShell()
+                // Session Check on App Start
+                LaunchedEffect(Unit) {
+                    val user = registrationViewModel.checkSession()
+                    if (user != null) {
+                        currentFlow = "MAIN"
+                    }
+                }
+
+                BackHandler(enabled = currentFlow != "LOGIN" && currentFlow != "MAIN") {
+                    currentFlow = when (currentFlow) {
+                        "REGISTER_STEP_B" -> "REGISTER_STEP_A"
+                        "REGISTER_STEP_C" -> "REGISTER_STEP_B"
+                        "PROFILE_REVIEW" -> "REGISTER_STEP_C"
+                        else -> "LOGIN"
+                    }
+                }
+
+                AnimatedContent(
+                    targetState = currentFlow,
+                    transitionSpec = {
+                        (slideInHorizontally { it } + fadeIn())
+                            .togetherWith(slideOutHorizontally { -it } + fadeOut())
+                    },
+                    label = "flow_navigation"
+                ) { targetState ->
+                    when (targetState) {
+                        "LOGIN" -> LoginScreen(
+                            onLoginSuccess = { currentFlow = "MAIN" },
+                            onNavigateToRegister = { currentFlow = "REGISTER_STEP_A" },
+                            onContinueAsGuest = { currentFlow = "MAIN" }
+                        )
+
+                        "REGISTER_STEP_A" -> RegistrationStepA(
+                            viewModel = registrationViewModel,
+                            onNext = { currentFlow = "REGISTER_STEP_B" },
+                            onBack = { currentFlow = "LOGIN" },
+                            onContinueAsGuest = { currentFlow = "MAIN" }
+                        )
+
+                        "REGISTER_STEP_B" -> RegistrationStepB(
+                            viewModel = registrationViewModel,
+                            onNext = { currentFlow = "REGISTER_STEP_C" },
+                            onBack = { currentFlow = "REGISTER_STEP_A" }
+                        )
+
+                        "REGISTER_STEP_C" -> RegistrationStepC(
+                            viewModel = registrationViewModel,
+                            onComplete = { currentFlow = "PROFILE_REVIEW" }, // TRIGGERS REVIEW
+                            onBack = { currentFlow = "REGISTER_STEP_B" }
+                        )
+
+                        "PROFILE_REVIEW" -> ProfileReviewScreen(
+                            viewModel = registrationViewModel,
+                            onFinish = { currentFlow = "LOGIN" } // Go to login to verify credentials
+                        )
+
+                        "MAIN" -> MainAppShell(
+                            onLogout = {
+                                registrationViewModel.logout()
+                                currentFlow = "LOGIN"
+                            }
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Welcome to $name",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    EchoLogTheme {
-        Greeting("EchoLog User")
     }
 }

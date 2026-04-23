@@ -1,59 +1,60 @@
 package com.echolog.app.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppShell() {
-    var selectedScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-
+fun MainAppShell(
+    onLogout: () -> Unit // Add this parameter
+) {
     Scaffold(
-        bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 0.dp
-            ) {
-                bottomNavItems.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                        selected = selectedScreen == screen,
-                        onClick = { selectedScreen = screen },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color.Black,
-                            unselectedIconColor = Color.Gray,
-                            indicatorColor = Color(0xFFF5F5F5)
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text("EchoLog", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                },
+                actions = {
+                    // This is your actual logout button
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Logout",
+                            tint = Color.Red
                         )
-                    )
+                    }
                 }
-            }
+            )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            when (selectedScreen) {
-                is Screen.Home -> PlaceholderScreen("Home Feed")
-                is Screen.Discovery -> PlaceholderScreen("Discovery")
-                is Screen.Create -> PlaceholderScreen("Create Post")
-                is Screen.Saved -> PlaceholderScreen("Saved Content")
-                is Screen.Profile -> PlaceholderScreen("Profile & Settings")
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Welcome to the Home Screen!", fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("You are successfully logged in.", color = Color.Gray)
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = onLogout,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            ) {
+                Text("Logout Now", color = Color.White)
             }
         }
-    }
-}
-
-@Composable
-fun PlaceholderScreen(name: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = name, style = MaterialTheme.typography.headlineMedium)
     }
 }
