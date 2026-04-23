@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 @HiltViewModel
 class LogViewModel @Inject constructor(
@@ -27,6 +29,14 @@ class LogViewModel @Inject constructor(
     private val currentUserId: String?
         get() = supabase.auth.currentUserOrNull()?.id
 
+    private val _userCategories = MutableStateFlow(listOf("Study", "Work", "Workout", "Personal", "Travel", "General"))
+    val userCategories = _userCategories.asStateFlow()
+    fun addNewCategory(name: String) {
+        if (!_userCategories.value.contains(name)) {
+            _userCategories.value = _userCategories.value + name
+            // Optional: Save to Supabase 'user_preferences' table here
+        }
+    }
     @OptIn(ExperimentalCoroutinesApi::class)
     val recentLogs: StateFlow<List<LogEntity>> = supabase.auth.sessionStatus
         .flatMapLatest { status ->

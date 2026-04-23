@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -12,9 +14,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echolog.app.viewmodel.RegistrationViewModel
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
-
 @Composable
 fun RegistrationStepA(
     viewModel: RegistrationViewModel,
@@ -22,6 +21,7 @@ fun RegistrationStepA(
     onBack: () -> Unit,
     onContinueAsGuest: () -> Unit
 ) {
+    // Explicitly using 'by' delegate requires androidx.compose.runtime.getValue import
     val username by viewModel.username.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     val isChecking by viewModel.isChecking.collectAsState()
@@ -55,7 +55,10 @@ fun RegistrationStepA(
         // ===== FORM CARD =====
         Card(
             shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
         ) {
 
             Column(modifier = Modifier.padding(20.dp)) {
@@ -106,7 +109,7 @@ fun RegistrationStepA(
                     isError = usernameError != null,
                     supportingText = {
                         usernameError?.let {
-                            Text(it, color = Color.Red)
+                            Text(it, color = MaterialTheme.colorScheme.error)
                         }
                     },
                     shape = RoundedCornerShape(12.dp)
@@ -163,12 +166,14 @@ fun RegistrationStepA(
 
             TextButton(
                 onClick = onBack,
-                contentPadding = PaddingValues(0.dp)
+                // PaddingValues(0.dp) requires specific import
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
             ) {
                 Text(
                     "Login",
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

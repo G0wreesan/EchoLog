@@ -10,6 +10,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,18 +22,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil3.compose.rememberAsyncImagePainter
+import com.echolog.app.util.AudioRecorder
 import com.echolog.app.viewmodel.LogViewModel
 import java.io.File
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import com.echolog.app.util.AudioRecorder // Import your utility
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.DatePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,46 +38,61 @@ fun CreateLogScreen(
     onSaveSuccess: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
-    // UI State
+    // ===== UI State =====
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    val categories = listOf("Study", "Work", "Workout", "Personal", "Travel", "General")
-    var selectedCategory by remember { mutableStateOf(categories[0]) }
-    var expanded by remember { mutableStateOf(false) }
 
-    // Date & Reminder State
+    // Category Logic
+    val userCategories by viewModel.userCategories.collectAsState()
+    var selectedCategory by remember { mutableStateOf<String>(userCategories.firstOrNull() ?: "General") }
+    var expanded by remember { mutableStateOf(false) }
+    var showNewCategoryDialog by remember { mutableStateOf(false) }
+    var newCategoryInput by remember { mutableStateOf("") }
+
+    // Date/Reminder State
     var scheduledAt by remember { mutableStateOf<Long?>(null) }
     val datePickerState = rememberDatePickerState()
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // Media Logic State
+    // Media State
     val selectedMediaPaths = remember { mutableStateListOf<String>() }
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
-
-    // Audio State
     var isRecording by remember { mutableStateOf(false) }
     val recorder = remember { AudioRecorder(context) }
     var audioFile by remember { mutableStateOf<File?>(null) }
 
-    // Permission Launcher
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { perms ->
-        if (perms[Manifest.permission.RECORD_AUDIO] == false) {
-            Toast.makeText(context, "Mic permission needed", Toast.LENGTH_SHORT).show()
-        }
-    }
+    // ===== Launchers (Order Matters!) =====
 
-    // Camera/Gallery Launchers (Keep your existing ones)
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { selectedMediaPaths.add(it.toString()) }
-    }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+    // 1. Camera Launcher (Defined first)
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
         if (success) tempPhotoUri?.let { selectedMediaPaths.add(it.toString()) }
     }
 
+    // 2. Permission Launcher (Can now reference cameraLauncher)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        val cameraGranted = perms[Manifest.permission.CAMERA] == true
+        val micGranted = perms[Manifest.permission.RECORD_AUDIO] == true
+
+        if (cameraGranted) {
+            // Safe to create file and launch camera here
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "IMG_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            tempPhotoUri = uri
+            cameraLauncher.launch(uri)
+        } else if (perms.containsKey(Manifest.permission.CAMERA)) {
+            Toast.makeText(context, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { selectedMediaPaths.add(it.toString()) } }
+    val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { selectedMediaPaths.add(it.toString()) } }
+
+    // ===== Dialogs =====
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -93,6 +105,31 @@ fun CreateLogScreen(
         ) { DatePicker(state = datePickerState) }
     }
 
+    if (showNewCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewCategoryDialog = false },
+            title = { Text("Create New Category") },
+            text = {
+                OutlinedTextField(
+                    value = newCategoryInput,
+                    onValueChange = { newCategoryInput = it },
+                    label = { Text("Category Name") }
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newCategoryInput.isNotBlank()) {
+                        viewModel.addNewCategory(newCategoryInput)
+                        selectedCategory = newCategoryInput
+                        newCategoryInput = ""
+                        showNewCategoryDialog = false
+                    }
+                }) { Text("Add") }
+            }
+        )
+    }
+
+    // ===== Main UI =====
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -100,30 +137,59 @@ fun CreateLogScreen(
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text("Create Entry", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+        Text("Create Entry", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(modifier = Modifier.height(20.dp))
 
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("Title", color = Color.Black) },
+            label = { Text("Title") },
             modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black)
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Category Dropdown
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedCategory,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Category") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                modifier = Modifier.fillMaxWidth().menuAnchor()
+            )
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                userCategories.forEach { cat ->
+                    DropdownMenuItem(
+                        text = { Text(cat) },
+                        onClick = { selectedCategory = cat; expanded = false }
+                    )
+                }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("+ Add Custom", color = Color.Blue) },
+                    onClick = { expanded = false; showNewCategoryDialog = true }
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = description,
             onValueChange = { description = it },
-            label = { Text("Description", color = Color.Black) },
+            label = { Text("Description") },
             modifier = Modifier.fillMaxWidth().height(120.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Reminder Button
         OutlinedButton(
             onClick = { showDatePicker = true },
             modifier = Modifier.fillMaxWidth(),
@@ -137,25 +203,23 @@ fun CreateLogScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("Add Media", fontWeight = FontWeight.Bold, color = Color.Black)
+        Text("Add Media", fontWeight = FontWeight.Bold)
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Camera
+            // FIXED CAMERA BUTTON
             IconButton(onClick = {
-                val uri = FileProvider.getUriForFile(context, "com.echolog.app.fileprovider",
-                    File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "temp_${System.currentTimeMillis()}.jpg"))
-                tempPhotoUri = uri
-                cameraLauncher.launch(uri)
-            }) { Icon(Icons.Default.PhotoCamera, null, tint = Color.Black) }
+                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+            }) {
+                Icon(Icons.Default.PhotoCamera, null)
+            }
 
-            // Mic (Audio Recording)
             IconButton(
                 onClick = {
                     permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                     if (!isRecording) {
-                        val file = File(context.cacheDir, "voice_${System.currentTimeMillis()}.mp3")
+                        val file = File(context.cacheDir, "VOICE_${System.currentTimeMillis()}.mp3")
                         audioFile = file
                         recorder.startRecording(file)
                         isRecording = true
@@ -168,13 +232,15 @@ fun CreateLogScreen(
                 modifier = Modifier.background(if (isRecording) Color.Red else Color.Transparent, CircleShape)
             ) { Icon(Icons.Default.Mic, null, tint = if (isRecording) Color.White else Color.Black) }
 
-            // Gallery
+            IconButton(onClick = { videoLauncher.launch("video/*") }) {
+                Icon(Icons.Default.VideoCall, null)
+            }
+
             IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-                Icon(Icons.Default.Collections, null, tint = Color.Black)
+                Icon(Icons.Default.Collections, null)
             }
         }
 
-        // Preview Row
         if (selectedMediaPaths.isNotEmpty()) {
             LazyRow(modifier = Modifier.fillMaxWidth().height(100.dp)) {
                 items(selectedMediaPaths) { path ->
@@ -185,9 +251,10 @@ fun CreateLogScreen(
                             modifier = Modifier.size(100.dp).clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        IconButton(onClick = { selectedMediaPaths.remove(path) }, Modifier.align(Alignment.TopEnd).size(20.dp).background(Color.Black.copy(0.6f), CircleShape)) {
-                            Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                        }
+                        IconButton(
+                            onClick = { selectedMediaPaths.remove(path) },
+                            modifier = Modifier.align(Alignment.TopEnd).size(20.dp).background(Color.Black.copy(0.6f), CircleShape)
+                        ) { Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp)) }
                     }
                 }
             }
@@ -211,8 +278,6 @@ fun CreateLogScreen(
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
             shape = RoundedCornerShape(16.dp)
-        ) {
-            Text("Save Memory", fontWeight = FontWeight.Bold)
-        }
+        ) { Text("Save Memory", fontWeight = FontWeight.Bold) }
     }
 }
