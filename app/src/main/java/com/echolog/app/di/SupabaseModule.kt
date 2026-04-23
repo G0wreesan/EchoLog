@@ -11,6 +11,8 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 import javax.inject.Singleton
 
+import io.github.jan.supabase.postgrest.postgrest
+
 @Module
 @InstallIn(SingletonComponent::class)
 object SupabaseModule {
@@ -26,5 +28,11 @@ object SupabaseModule {
             install(Postgrest)
             install(Storage)
         }
+    }
+
+    @Provides
+    @Singleton
+    fun providePostgrest(client: SupabaseClient): Postgrest {
+        return client.postgrest
     }
 }

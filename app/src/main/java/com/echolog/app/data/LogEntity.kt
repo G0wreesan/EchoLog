@@ -14,13 +14,14 @@ data class LogEntity(
     val title: String,
     val caption: String?,
     val category: String,
-    val logType: String, // "memory", "task", "assignment", "other"
-    val localMediaPaths: List<String>, // Needs TypeConverter
+    val logType: String,
+    val localMediaPaths: List<String>,
     val remoteMediaUrls: List<String> = emptyList(),
-    val scheduledAt: Long?,
+    val scheduledAt: Long?, // This is your reminder/notification date
     val createdAt: Long = System.currentTimeMillis(),
     val isSynced: Boolean = false,
-    val colorHex: String = "#000000"
+    val colorHex: String = "#000000",
+    val hasReminder: Boolean = false
 )
 
 // Add this to handle the List<String> in Room

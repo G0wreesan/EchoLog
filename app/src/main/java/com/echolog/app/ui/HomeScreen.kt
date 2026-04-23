@@ -63,6 +63,7 @@ fun HomeScreen(viewModel: LogViewModel) {
                 )
             }
 
+
             if (logs.isEmpty()) {
                 item {
                     Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
