@@ -24,6 +24,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.echolog.app.viewmodel.LogViewModel
 import com.echolog.app.viewmodel.RegistrationViewModel
 
+
 @Composable
 fun MainAppShell(
     registrationViewModel: RegistrationViewModel, // Renamed for clarity
@@ -64,17 +65,12 @@ fun MainAppShell(
                     Text("Calendar View Coming Soon")
                 }
                 2 -> CreateLogScreen(logViewModel) { selectedTab = 0 }
-                3 -> Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
-                    Text("Browse Logs")
-                }
+                3 -> BrowseScreen(logViewModel)
                 4 -> VaultScreen(registrationViewModel, onLogout)
             }
         }
     }
 }
-
-
-
 
 
 @Composable

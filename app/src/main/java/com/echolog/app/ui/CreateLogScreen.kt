@@ -27,6 +27,12 @@ import coil3.compose.rememberAsyncImagePainter
 import com.echolog.app.viewmodel.LogViewModel
 import java.io.File
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.echolog.app.util.AudioRecorder // Import your utility
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.DatePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +41,7 @@ fun CreateLogScreen(
     onSaveSuccess: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // UI State
     var title by remember { mutableStateOf("") }
@@ -43,49 +50,65 @@ fun CreateLogScreen(
     var selectedCategory by remember { mutableStateOf(categories[0]) }
     var expanded by remember { mutableStateOf(false) }
 
+    // Date & Reminder State
+    var scheduledAt by remember { mutableStateOf<Long?>(null) }
+    val datePickerState = rememberDatePickerState()
+    var showDatePicker by remember { mutableStateOf(false) }
+
     // Media Logic State
     val selectedMediaPaths = remember { mutableStateListOf<String>() }
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
-    // --- FUNCTIONAL LOGIC (From Your Code) ---
-    fun getTempUri(): Uri {
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "temp_${System.currentTimeMillis()}.jpg")
-        return FileProvider.getUriForFile(context, "com.echolog.app.fileprovider", file)
+    // Audio State
+    var isRecording by remember { mutableStateOf(false) }
+    val recorder = remember { AudioRecorder(context) }
+    var audioFile by remember { mutableStateOf<File?>(null) }
+
+    // Permission Launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        if (perms[Manifest.permission.RECORD_AUDIO] == false) {
+            Toast.makeText(context, "Mic permission needed", Toast.LENGTH_SHORT).show()
+        }
     }
 
+    // Camera/Gallery Launchers (Keep your existing ones)
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { selectedMediaPaths.add(it.toString()) }
     }
-
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) tempPhotoUri?.let { selectedMediaPaths.add(it.toString()) }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { perms ->
-        if (perms[Manifest.permission.CAMERA] == false) {
-            Toast.makeText(context, "Camera permission required", Toast.LENGTH_SHORT).show()
-        }
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    scheduledAt = datePickerState.selectedDateMillis
+                    showDatePicker = false
+                }) { Text("OK", color = Color.Black) }
+            }
+        ) { DatePicker(state = datePickerState) }
     }
 
-    // --- UI LAYOUT (Friend's Style + Merged Features) ---
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F7F7))
+            .background(Color.White)
             .verticalScroll(rememberScrollState())
-            .padding(20.dp)
+            .padding(24.dp)
     ) {
-        Text(text = "Create Entry", style = MaterialTheme.typography.headlineMedium)
+        Text("Create Entry", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
         Spacer(modifier = Modifier.height(20.dp))
 
         OutlinedTextField(
             value = title,
             onValueChange = { title = it },
-            label = { Text("Title") },
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
+            label = { Text("Title", color = Color.Black) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -93,107 +116,103 @@ fun CreateLogScreen(
         OutlinedTextField(
             value = description,
             onValueChange = { description = it },
-            label = { Text("Description") },
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().height(140.dp)
+            label = { Text("Description", color = Color.Black) },
+            modifier = Modifier.fillMaxWidth().height(120.dp),
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Dropdown from friend's code
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
+        // Reminder Button
+        OutlinedButton(
+            onClick = { showDatePicker = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, if (scheduledAt != null) Color.Blue else Color.Gray)
         ) {
-            OutlinedTextField(
-                value = selectedCategory,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Category") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor()
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                categories.forEach { category ->
-                    DropdownMenuItem(
-                        text = { Text(category) },
-                        onClick = { selectedCategory = category; expanded = false }
-                    )
-                }
-            }
+            Icon(Icons.Default.NotificationsActive, null, tint = Color.Black)
+            Spacer(Modifier.width(8.dp))
+            Text(if (scheduledAt == null) "Add Reminder" else "Reminder Set", color = Color.Black)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Combined Media Section
-        Text(text = "Add Media", style = MaterialTheme.typography.titleMedium)
+        Text("Add Media", fontWeight = FontWeight.Bold, color = Color.Black)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // Camera
             IconButton(onClick = {
-                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
-                val uri = getTempUri()
+                val uri = FileProvider.getUriForFile(context, "com.echolog.app.fileprovider",
+                    File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "temp_${System.currentTimeMillis()}.jpg"))
                 tempPhotoUri = uri
                 cameraLauncher.launch(uri)
-            }) { Icon(Icons.Default.PhotoCamera, "Camera") }
+            }) { Icon(Icons.Default.PhotoCamera, null, tint = Color.Black) }
 
-            IconButton(onClick = {
-                permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-                // Audio Logic goes here
-            }) { Icon(Icons.Default.Mic, "Voice") }
+            // Mic (Audio Recording)
+            IconButton(
+                onClick = {
+                    permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                    if (!isRecording) {
+                        val file = File(context.cacheDir, "voice_${System.currentTimeMillis()}.mp3")
+                        audioFile = file
+                        recorder.startRecording(file)
+                        isRecording = true
+                    } else {
+                        recorder.stopRecording()
+                        isRecording = false
+                        audioFile?.let { selectedMediaPaths.add(Uri.fromFile(it).toString()) }
+                    }
+                },
+                modifier = Modifier.background(if (isRecording) Color.Red else Color.Transparent, CircleShape)
+            ) { Icon(Icons.Default.Mic, null, tint = if (isRecording) Color.White else Color.Black) }
 
+            // Gallery
             IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-                Icon(Icons.Default.Collections, "Gallery")
+                Icon(Icons.Default.Collections, null, tint = Color.Black)
             }
         }
 
-        // --- NEW: Horizontal Media Preview ---
+        // Preview Row
         if (selectedMediaPaths.isNotEmpty()) {
-            LazyRow(modifier = Modifier.height(120.dp).fillMaxWidth()) {
+            LazyRow(modifier = Modifier.fillMaxWidth().height(100.dp)) {
                 items(selectedMediaPaths) { path ->
-                    Box(modifier = Modifier.padding(end = 8.dp)) {
+                    Box(Modifier.padding(end = 8.dp)) {
                         Image(
                             painter = rememberAsyncImagePainter(path),
                             contentDescription = null,
-                            modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)),
+                            modifier = Modifier.size(100.dp).clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        // Delete button for media
-                        IconButton(
-                            onClick = { selectedMediaPaths.remove(path) },
-                            modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(0.4f), CircleShape).size(24.dp)
-                        ) { Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                        IconButton(onClick = { selectedMediaPaths.remove(path) }, Modifier.align(Alignment.TopEnd).size(20.dp).background(Color.Black.copy(0.6f), CircleShape)) {
+                            Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = {
-
                 viewModel.saveNewLog(
                     title = title,
-                    caption = description, // Matches your 'description' state
+                    caption = description,
                     category = selectedCategory,
                     type = "memory",
                     mediaPaths = selectedMediaPaths.toList(),
-
-                    colorHex = "#000000", // Or pass a dynamic color if you added a picker
-                    scheduledAt = null,    // Or pass your date state
-                    context = context      // This is the important one for file saving!
+                    scheduledAt = scheduledAt,
+                    context = context
                 )
                 onSaveSuccess()
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(55.dp),
-            enabled = title.isNotBlank(),
-            shape = RoundedCornerShape(14.dp)
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Text("Save Entry")
+            Text("Save Memory", fontWeight = FontWeight.Bold)
         }
     }
 }
