@@ -34,8 +34,12 @@ fun MainAppShell(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
+        containerColor = Color(0xCC3FC1FD), // ✅ App background color
         bottomBar = {
-            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+            NavigationBar(
+                containerColor = Color(0xCC3FC1FD),
+                tonalElevation = 8.dp
+            ) {
                 bottomNavItems.forEachIndexed { index, screen ->
                     NavigationBarItem(
                         selected = selectedTab == index,
@@ -45,11 +49,11 @@ fun MainAppShell(
                                 Icon(
                                     imageVector = screen.icon,
                                     contentDescription = null,
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(32.dp)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(50.dp)
                                 )
                             } else {
-                                Icon(screen.icon, contentDescription = null)
+                                Icon(screen.icon, contentDescription = null, tint = Color.White)
                             }
                         },
                         label = { if (screen !is Screen.Create) Text(screen.title) }
@@ -58,10 +62,20 @@ fun MainAppShell(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xCC3FC1FD)) // ✅ ensures full background coverage
+                .padding(padding)
+        ) {
             when (selectedTab) {
                 0 -> HomeScreen(logViewModel)
-                1 -> Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
+                1 -> Column(
+                    Modifier.fillMaxSize(),
+                    Arrangement.Center,
+                    Alignment.CenterHorizontally
+                ) {
                     Text("Calendar View Coming Soon")
                 }
                 2 -> CreateLogScreen(logViewModel) { selectedTab = 0 }
@@ -85,8 +99,12 @@ fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: St
     ) {
         Icon(icon, null, tint = Color.DarkGray, modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.width(16.dp))
-        Text(title, fontSize = 16.sp)
+        Text(
+            title,
+            fontSize = 16.sp,
+            color = Color.White
+        )
         Spacer(modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.LightGray)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White)
     }
 }
