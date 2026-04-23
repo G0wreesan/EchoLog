@@ -12,6 +12,7 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,15 @@ class RegistrationViewModel @Inject constructor(
     private val supabase: SupabaseClient
 ) : ViewModel() {
 
+    init {
+        viewModelScope.launch {
+            supabase.auth.sessionStatus.collect { status ->
+                if (status is SessionStatus.Authenticated) {
+                    fetchUserProfile() // This pulls from Supabase 'profiles' table
+                }
+            }
+        }
+    }
     // --- State Management ---
     private val _username = MutableStateFlow("")
     val username = _username.asStateFlow()
@@ -138,10 +148,7 @@ class RegistrationViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Corrected Finalize Account
-     * Uses UserProfile instead of "Models"
-     */
+
     fun finalizeAccount(onComplete: () -> Unit) {
         viewModelScope.launch {
             _isChecking.value = true

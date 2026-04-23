@@ -9,8 +9,10 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 
 @Entity(tableName = "logs")
+@Serializable
 data class LogEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val userId: String,
     val title: String,
     val caption: String?,
     val category: String,
