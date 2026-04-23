@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,6 +12,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echolog.app.viewmodel.RegistrationViewModel
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+
 @Composable
 fun RegistrationStepA(
     viewModel: RegistrationViewModel,
@@ -21,7 +22,6 @@ fun RegistrationStepA(
     onBack: () -> Unit,
     onContinueAsGuest: () -> Unit
 ) {
-    // Explicitly using 'by' delegate requires androidx.compose.runtime.getValue import
     val username by viewModel.username.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     val isChecking by viewModel.isChecking.collectAsState()
@@ -55,10 +55,8 @@ fun RegistrationStepA(
         // ===== FORM CARD =====
         Card(
             shape = RoundedCornerShape(24.dp),
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7)),
+            modifier = Modifier.fillMaxWidth()
         ) {
 
             Column(modifier = Modifier.padding(20.dp)) {
@@ -86,6 +84,7 @@ fun RegistrationStepA(
                     placeholder = { Text("What is your display name?") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     shape = RoundedCornerShape(12.dp)
                 )
 
@@ -106,10 +105,11 @@ fun RegistrationStepA(
                     placeholder = { Text("@unique_handle") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     isError = usernameError != null,
                     supportingText = {
                         usernameError?.let {
-                            Text(it, color = MaterialTheme.colorScheme.error)
+                            Text(it, color = Color.Red)
                         }
                     },
                     shape = RoundedCornerShape(12.dp)
@@ -124,11 +124,17 @@ fun RegistrationStepA(
                         .fillMaxWidth()
                         .height(52.dp),
                     enabled = !isChecking && username.isNotEmpty() && displayName.isNotEmpty(),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xCC3FC1FD),       // enabled (blue)
+                        contentColor = Color.Black,              // text color
+                        disabledContainerColor = Color(0xFFE0E0E0), // disabled (gray)
+                        disabledContentColor = Color.Gray        // disabled text
+                    )
                 ) {
                     if (isChecking) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = Color.Black,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(22.dp)
                         )
@@ -166,14 +172,12 @@ fun RegistrationStepA(
 
             TextButton(
                 onClick = onBack,
-                // PaddingValues(0.dp) requires specific import
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                contentPadding = PaddingValues(0.dp)
             ) {
                 Text(
                     "Login",
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

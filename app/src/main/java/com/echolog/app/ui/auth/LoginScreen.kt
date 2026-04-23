@@ -57,6 +57,7 @@ fun LoginScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7)),
             elevation = CardDefaults.cardElevation(6.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -67,6 +68,7 @@ fun LoginScreen(
                     label = { Text("Email or Username") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -79,6 +81,7 @@ fun LoginScreen(
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     modifier = Modifier.fillMaxWidth()
                 )
 
