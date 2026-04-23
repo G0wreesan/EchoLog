@@ -89,6 +89,7 @@ fun RegistrationStepB(
         // ===== PROFILE PREVIEW CARD =====
         Card(
             shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F8)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(

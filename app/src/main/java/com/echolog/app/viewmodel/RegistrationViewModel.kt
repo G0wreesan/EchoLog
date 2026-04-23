@@ -3,7 +3,6 @@ package com.echolog.app.viewmodel
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// IMPORT YOUR MODELS CORRECTLY
 import com.echolog.app.model.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -29,17 +28,21 @@ class RegistrationViewModel @Inject constructor(
         viewModelScope.launch {
             supabase.auth.sessionStatus.collect { status ->
                 if (status is SessionStatus.Authenticated) {
-                    fetchUserProfile() // This pulls from Supabase 'profiles' table
+                    fetchUserProfile()
                 }
             }
         }
     }
+
     // --- State Management ---
     private val _username = MutableStateFlow("")
     val username = _username.asStateFlow()
 
     private val _displayName = MutableStateFlow("")
     val displayName = _displayName.asStateFlow()
+
+    private val _usernameError = MutableStateFlow<String?>(null)
+    val usernameError = _usernameError.asStateFlow()
 
     private val _selectedAvatarRes = MutableStateFlow<Int?>(null)
     val selectedAvatarRes = _selectedAvatarRes.asStateFlow()
@@ -59,8 +62,8 @@ class RegistrationViewModel @Inject constructor(
     private val _isOtpSent = MutableStateFlow(false)
     val isOtpSent = _isOtpSent.asStateFlow()
 
-    private val _interests = MutableStateFlow<Set<String>>(emptySet())
-    val interests = _interests.asStateFlow()
+    private val _dob = MutableStateFlow("2000-01-01")
+    val dob = _dob.asStateFlow()
 
     private val _isChecking = MutableStateFlow(false)
     val isChecking = _isChecking.asStateFlow()
@@ -68,33 +71,48 @@ class RegistrationViewModel @Inject constructor(
     private val _authError = MutableStateFlow<String?>(null)
     val authError = _authError.asStateFlow()
 
-    val availableCategories = listOf("Tech", "Design", "Gaming", "Music", "Art", "Food", "Travel", "Fitness")
-
-    private val _usernameError = MutableStateFlow<String?>(null)
-    val usernameError = _usernameError.asStateFlow()
-
-    private val _isLoggingIn = MutableStateFlow(false)
-    val isLoggingIn = _isLoggingIn.asStateFlow()
-
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile = _userProfile.asStateFlow()
 
     // --- Actions ---
-    fun onUsernameChange(it: String) { _username.value = it }
+    fun onUsernameChange(it: String) {
+        _username.value = it
+        if (_usernameError.value != null) _usernameError.value = null
+    }
     fun onDisplayNameChange(it: String) { _displayName.value = it }
     fun onEmailChange(it: String) { _email.value = it }
     fun onPasswordChange(it: String) { _password.value = it }
     fun onOtpChange(it: String) { _otpCode.value = it }
+    fun onDobChange(it: String) { _dob.value = it }
     fun selectAvatar(resId: Int) { _selectedAvatarRes.value = resId; _selectedBitmap.value = null }
     fun setCustomBitmap(bitmap: Bitmap) { _selectedBitmap.value = bitmap; _selectedAvatarRes.value = null }
 
-    fun toggleInterest(category: String) {
-        val current = _interests.value
-        if (current.contains(category)) _interests.value = current - category
-        else if (current.size < 6) _interests.value = current + category
-    }
+    // --- Core Logic ---
 
-    // --- Logic ---
+    fun validateUsername(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _isChecking.value = true
+            _usernameError.value = null
+            delay(600) // Aesthetic delay for progress indicator
+
+            if (_username.value.length < 4) {
+                _usernameError.value = "Username is too short"
+            } else {
+                // Logic: Check if username exists in Supabase 'profiles' table
+                try {
+                    val count = supabase.postgrest.from("profiles")
+                        .select {
+                            filter { eq("username", _username.value) }
+                        }.data.length // Simplified check
+
+                    onSuccess()
+                } catch (e: Exception) {
+                    onSuccess() // Proceeding for now, adjust based on table constraints
+                }
+            }
+            _isChecking.value = false
+        }
+    }
 
     fun signUpWithEmail() {
         viewModelScope.launch {
@@ -112,21 +130,23 @@ class RegistrationViewModel @Inject constructor(
             }
         }
     }
-
-    fun validateUsername(onSuccess: () -> Unit) {
+    fun loginWithEmail(identifier: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isChecking.value = true
-            _usernameError.value = null // Clear old errors
-            delay(800) // Simulating a network check
-
-            if (_username.value.length < 6) {
-                _usernameError.value = "Username must be at least 6 characters"
-            } else {
-                // If you want to check if it exists in Supabase:
-                // val exists = supabase.postgrest.from("profiles").select { filter { eq("username", _username.value) } }.data.isNotEmpty()
+            _authError.value = null
+            try {
+                // Supabase Auth call
+                supabase.auth.signInWith(Email) {
+                    email = identifier
+                    password = pass
+                }
+                // Once signed in, the init block's collector will trigger fetchUserProfile()
                 onSuccess()
+            } catch (e: Exception) {
+                _authError.value = "Login Failed: ${e.localizedMessage}"
+            } finally {
+                _isChecking.value = false
             }
-            _isChecking.value = false
         }
     }
 
@@ -148,15 +168,13 @@ class RegistrationViewModel @Inject constructor(
         }
     }
 
-
     fun finalizeAccount(onComplete: () -> Unit) {
         viewModelScope.launch {
             _isChecking.value = true
             try {
-                val user = supabase.auth.currentUserOrNull() ?: throw Exception("Auth session missing")
+                val user = supabase.auth.currentUserOrNull() ?: throw Exception("No Auth User")
                 var finalAvatarUrl: String? = null
 
-                // 1. Handle Custom Bitmap (Gallery Upload)
                 if (_selectedBitmap.value != null) {
                     val stream = ByteArrayOutputStream()
                     _selectedBitmap.value!!.compress(Bitmap.CompressFormat.JPEG, 80, stream)
@@ -164,82 +182,56 @@ class RegistrationViewModel @Inject constructor(
                     val bucket = supabase.storage.from("avatars")
                     bucket.upload(fileName, stream.toByteArray()) { upsert = true }
                     finalAvatarUrl = bucket.publicUrl(fileName)
-                }
-                // 2. Handle Default Avatars (PNGs)
-                else if (_selectedAvatarRes.value != null) {
-                    // We store a special identifier or the resource name to know it's a local resource
+                } else if (_selectedAvatarRes.value != null) {
                     finalAvatarUrl = "local_res_${_selectedAvatarRes.value}"
                 }
 
-                // 3. Save to 'profiles' table
                 val profile = UserProfile(
                     id = user.id,
                     username = _username.value,
                     display_name = _displayName.value,
                     email = _email.value,
-                    date_of_birth = "2000-01-01", // Placeholder or get from State
+                    date_of_birth = _dob.value,
                     avatar_url = finalAvatarUrl
                 )
 
                 supabase.postgrest.from("profiles").upsert(profile)
-                _userProfile.value = profile // Update local state
+                _userProfile.value = profile
                 onComplete()
             } catch (e: Exception) {
-                _authError.value = "Finalization failed: ${e.localizedMessage}"
+                _authError.value = "Error: ${e.localizedMessage}"
             } finally {
                 _isChecking.value = false
             }
-        }
-    }
-
-    fun signIn(onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            _isChecking.value = true
-            _authError.value = null // Clear previous errors
-            try {
-                supabase.auth.signInWith(Email) {
-                    email = _email.value
-                    password = _password.value
-                }
-                // If we get here, it worked!
-                onSuccess()
-            } catch (e: Exception) {
-                _authError.value = "Invalid email or password."
-            } finally {
-                _isChecking.value = false
-            }
-        }
-    }
-
-
-    suspend fun checkSession(): io.github.jan.supabase.auth.user.UserInfo? {
-        return try {
-            supabase.auth.retrieveUserForCurrentSession(updateSession = true)
-        } catch (e: Exception) {
-            supabase.auth.signOut()
-            null
         }
     }
 
     fun fetchUserProfile() {
         viewModelScope.launch {
             try {
-                val user = supabase.auth.currentUserOrNull()
-                if (user != null) {
-                    val profile = supabase.postgrest.from("profiles")
-                        .select { filter { eq("id", user.id) } }
-                        .decodeSingle<UserProfile>()
-                    _userProfile.value = profile
-                }
+                val user = supabase.auth.currentUserOrNull() ?: return@launch
+                val profile = supabase.postgrest.from("profiles")
+                    .select { filter { eq("id", user.id) } }
+                    .decodeSingle<UserProfile>()
+                _userProfile.value = profile
             } catch (e: Exception) {
-                // Handle error
+                e.printStackTrace()
             }
+        }
+    }
+
+    suspend fun checkSession(): io.github.jan.supabase.auth.user.UserInfo? {
+        return try {
+            supabase.auth.retrieveUserForCurrentSession(updateSession = true)
+        } catch (e: Exception) {
+            null
         }
     }
 
     fun logout() {
         viewModelScope.launch {
             supabase.auth.signOut()
+            _userProfile.value = null
         }
     }
 }

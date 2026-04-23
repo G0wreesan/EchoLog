@@ -29,9 +29,31 @@ fun RegistrationStepC(
     val isChecking by viewModel.isChecking.collectAsState()
     val error by viewModel.authError.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text("EchoLog", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        Text("STEP 3: SECURITY", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 40.dp))
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Spacer(modifier = Modifier.height(80.dp))
+
+        // App Title
+        Text(
+            text = "EchoLog",
+            fontSize = 36.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "STEP 3: SECURITY",
+            color = Color.Gray,
+            fontSize = 14.sp
+        )
 
         AnimatedContent(targetState = isOtpSent, label = "auth_state") { sent ->
             if (!sent) {
@@ -41,14 +63,17 @@ fun RegistrationStepC(
                         value = email,
                         onValueChange = { viewModel.onEmailChange(it) },
                         label = { Text("Email Address") },
+                        textStyle = LocalTextStyle.current.copy(color = Color.Black),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { viewModel.onPasswordChange(it) },
                         label = { Text("Password") },
                         visualTransformation = PasswordVisualTransformation(),
+                        textStyle = LocalTextStyle.current.copy(color = Color.Black),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -85,7 +110,7 @@ fun RegistrationStepC(
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             enabled = !isChecking,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC3FC1FD))
         ) {
             if (isChecking) CircularProgressIndicator(
                 color = Color.White,
@@ -98,5 +123,12 @@ fun RegistrationStepC(
         TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Go Back", color = Color.Gray)
         }
+    }
+
+
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+
+
     }
 }

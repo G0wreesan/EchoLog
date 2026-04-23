@@ -8,7 +8,7 @@ data class Profile(
     val username: String,
     val display_name: String,
     val email: String,
-    val dob: String,
+    val date_of_birth: String,
     val avatar_url: String? = null
 )
 

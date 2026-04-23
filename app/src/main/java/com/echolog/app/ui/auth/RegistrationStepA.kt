@@ -55,6 +55,7 @@ fun RegistrationStepA(
         // ===== FORM CARD =====
         Card(
             shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7)),
             modifier = Modifier.fillMaxWidth()
         ) {
 
@@ -83,6 +84,7 @@ fun RegistrationStepA(
                     placeholder = { Text("What is your display name?") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     shape = RoundedCornerShape(12.dp)
                 )
 
@@ -103,6 +105,7 @@ fun RegistrationStepA(
                     placeholder = { Text("@unique_handle") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(color = Color.Black),
                     isError = usernameError != null,
                     supportingText = {
                         usernameError?.let {
@@ -121,11 +124,17 @@ fun RegistrationStepA(
                         .fillMaxWidth()
                         .height(52.dp),
                     enabled = !isChecking && username.isNotEmpty() && displayName.isNotEmpty(),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xCC3FC1FD),       // enabled (blue)
+                        contentColor = Color.Black,              // text color
+                        disabledContainerColor = Color(0xFFE0E0E0), // disabled (gray)
+                        disabledContentColor = Color.Gray        // disabled text
+                    )
                 ) {
                     if (isChecking) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = Color.Black,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(22.dp)
                         )
