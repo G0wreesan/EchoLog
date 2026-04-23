@@ -42,7 +42,7 @@ fun BrowseScreen(viewModel: LogViewModel) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White)
         )
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {

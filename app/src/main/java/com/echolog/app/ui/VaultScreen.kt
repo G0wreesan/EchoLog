@@ -119,7 +119,7 @@ fun VaultScreen(
                 Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(6.dp).background(if (isOnline) Color(0xFF4CAF50) else Color.Red, CircleShape))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (isOnline) "Synced" else "Offline", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isOnline) Color(0xFF2E7D32) else Color.Red)
+                    Text(if (isOnline) "Online" else "Offline", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isOnline) Color(0xFF2E7D32) else Color.Red)
                 }
             }
         }

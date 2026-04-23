@@ -114,6 +114,7 @@ fun CreateLogScreen(
                     value = newCategoryInput,
                     onValueChange = { newCategoryInput = it },
                     label = { Text("Category Name") }
+
                 )
             },
             confirmButton = {
@@ -137,7 +138,12 @@ fun CreateLogScreen(
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text("Create Entry", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+        Text(
+            "Create Entry",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xCC3FC1FD)
+        )
         Spacer(modifier = Modifier.height(20.dp))
 
         OutlinedTextField(
@@ -145,7 +151,8 @@ fun CreateLogScreen(
             onValueChange = { title = it },
             label = { Text("Title") },
             modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black)
+            textStyle = LocalTextStyle.current.copy(color = Color.Black),
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xCC3FC1FD))
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -159,6 +166,7 @@ fun CreateLogScreen(
                 value = selectedCategory,
                 onValueChange = {},
                 readOnly = true,
+                textStyle = LocalTextStyle.current.copy(color = Color.Black),
                 label = { Text("Category") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                 modifier = Modifier.fillMaxWidth().menuAnchor()
@@ -172,7 +180,7 @@ fun CreateLogScreen(
                 }
                 HorizontalDivider()
                 DropdownMenuItem(
-                    text = { Text("+ Add Custom", color = Color.Blue) },
+                    text = { Text("+ Add Custom", color = Color(0xCC3FC1FD)) },
                     onClick = { expanded = false; showNewCategoryDialog = true }
                 )
             }
@@ -184,8 +192,9 @@ fun CreateLogScreen(
             value = description,
             onValueChange = { description = it },
             label = { Text("Description") },
+            textStyle = LocalTextStyle.current.copy(color = Color.Black),
             modifier = Modifier.fillMaxWidth().height(120.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.Black)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xCC3FC1FD))
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -203,7 +212,7 @@ fun CreateLogScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("Add Media", fontWeight = FontWeight.Bold)
+        Text("Add Media", fontWeight = FontWeight.Bold,color = Color(0xCC3FC1FD))
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -212,7 +221,7 @@ fun CreateLogScreen(
             IconButton(onClick = {
                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
             }) {
-                Icon(Icons.Default.PhotoCamera, null)
+                Icon(Icons.Default.PhotoCamera, null, tint = Color.Black)
             }
 
             IconButton(
@@ -233,11 +242,11 @@ fun CreateLogScreen(
             ) { Icon(Icons.Default.Mic, null, tint = if (isRecording) Color.White else Color.Black) }
 
             IconButton(onClick = { videoLauncher.launch("video/*") }) {
-                Icon(Icons.Default.VideoCall, null)
+                Icon(Icons.Default.VideoCall, null, tint = Color.Black)
             }
 
             IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-                Icon(Icons.Default.Collections, null)
+                Icon(Icons.Default.Collections, null, tint = Color.Black)
             }
         }
 
@@ -304,8 +313,8 @@ fun CreateLogScreen(
                 onSaveSuccess()
             },
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC3FC1FD)),
             shape = RoundedCornerShape(16.dp)
-        ) { Text("Save Memory", fontWeight = FontWeight.Bold) }
+        ) { Text("Save Entry", fontWeight = FontWeight.Bold) }
     }
 }
