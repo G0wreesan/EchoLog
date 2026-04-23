@@ -62,21 +62,17 @@ class LogViewModel @Inject constructor(
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                // This now exists in the repository
                 val unsyncedLogs = repository.getUnsyncedLogs()
-
                 if (unsyncedLogs.isNotEmpty()) {
-                    // EXPLICIT TYPE: Passing <LogEntity> tells Supabase how to serialize it
-                    supabase.postgrest.from("logs").upsert<LogEntity>(unsyncedLogs)
+                    // Correct syntax for the latest SDK
+                    supabase.postgrest.from("logs").upsert(unsyncedLogs)
 
-                    unsyncedLogs.forEach { log: LogEntity ->
-                        // Make sure 'id' matches the name in your LogEntity (e.g., log.id or log.logId)
+                    unsyncedLogs.forEach { log ->
                         repository.updateSyncStatus(log.id, true)
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
-                // Log the error specifically for Supabase debugging
+                android.util.Log.e("LogViewModel", "Sync Error: ${e.localizedMessage}")
             } finally {
                 _isSyncing.value = false
             }

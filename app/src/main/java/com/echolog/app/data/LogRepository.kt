@@ -42,12 +42,19 @@ class LogRepository @Inject constructor(
     }
 
     suspend fun syncPendingLogs() {
-        val pending: List<LogEntity> = logDao.getUnsyncedLogs()
-        pending.forEach { log: LogEntity ->
-            try {
-                postgrest["logs"].insert(log)
+        val pending = logDao.getUnsyncedLogs()
+        if (pending.isEmpty()) return
+
+        try {
+            // Correct way to upsert a list in newer versions
+            postgrest.from("logs").upsert(pending)
+
+            // Only mark as synced if the network call succeeded
+            pending.forEach { log ->
                 logDao.markAsSynced(log.id)
-            } catch (e: Exception) { }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SYNC_ERROR", "Supabase sync failed: ${e.message}")
         }
     }
 
