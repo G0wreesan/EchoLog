@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                 ) { targetState ->
                     when (targetState) {
                         "LOGIN" -> LoginScreen(
+                            viewModel = registrationViewModel, // Pass it here
                             onLoginSuccess = { currentFlow = "MAIN" },
                             onNavigateToRegister = { currentFlow = "REGISTER_STEP_A" },
                             onContinueAsGuest = { currentFlow = "MAIN" }
@@ -77,10 +78,15 @@ class MainActivity : ComponentActivity() {
 
                         "PROFILE_REVIEW" -> ProfileReviewScreen(
                             viewModel = registrationViewModel,
-                            onFinish = { currentFlow = "LOGIN" } // Go to login to verify credentials
+                            onFinish = {
+                                registrationViewModel.finalizeAccount {
+                                    currentFlow = "LOGIN"
+                                }
+                            }
                         )
 
                         "MAIN" -> MainAppShell(
+                            registrationViewModel = registrationViewModel, // Use the new parameter name here
                             onLogout = {
                                 registrationViewModel.logout()
                                 currentFlow = "LOGIN"

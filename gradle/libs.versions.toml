@@ -12,6 +12,7 @@ coil = "3.0.4"
 ksp = "2.1.0-1.0.28"
 kotlinxSerialization = "1.7.3"
 ktor = "3.0.3"
+composeIcons = "1.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -38,6 +39,8 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version = "1.2.0" }
 
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
+
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "composeIcons" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

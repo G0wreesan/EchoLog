@@ -10,15 +10,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.echolog.app.viewmodel.RegistrationViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 
 @Composable
 fun LoginScreen(
+    viewModel: RegistrationViewModel, // Add the ViewModel here
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onContinueAsGuest: () -> Unit
 ) {
-    var identifier by remember { mutableStateOf("") } // Email or Username
-    var password by remember { mutableStateOf("") }
+    // Collect states from ViewModel
+    val email by viewModel.email.collectAsState()
+    val password by viewModel.password.collectAsState()
+    val isChecking by viewModel.isChecking.collectAsState()
+    val authError by viewModel.authError.collectAsState()
 
     Column(
         modifier = Modifier
@@ -29,26 +36,42 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(60.dp))
 
         Text("EchoLog", fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Text("Welcome back.", color = Color.Gray)
+        Text("Your personal vault.", color = Color.Gray) // Updated vibe
 
         Spacer(modifier = Modifier.height(48.dp))
 
+        // Email Field
         OutlinedTextField(
-            value = identifier,
-            onValueChange = { identifier = it },
-            label = { Text("Email or Username") },
-            modifier = Modifier.fillMaxWidth()
+            value = email,
+            onValueChange = { viewModel.onEmailChange(it) },
+            label = { Text("Email Address") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = authError != null
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Password Field
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = { viewModel.onPasswordChange(it) },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = authError != null
         )
+
+        // Error Message Display
+        if (authError != null) {
+            Text(
+                text = authError!!,
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 8.dp).align(Alignment.Start)
+            )
+        }
 
         TextButton(
             onClick = { /* Handle Forgot Password later */ },
@@ -59,12 +82,18 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Login Button
         Button(
-            onClick = onLoginSuccess,
+            onClick = { viewModel.signIn(onSuccess = onLoginSuccess) },
             modifier = Modifier.fillMaxWidth().height(50.dp),
+            enabled = !isChecking && email.isNotEmpty() && password.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
         ) {
-            Text("Login")
+            if (isChecking) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            } else {
+                Text("Login")
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

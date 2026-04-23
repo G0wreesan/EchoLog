@@ -10,9 +10,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echolog.app.viewmodel.RegistrationViewModel
 
+// CRITICAL IMPORTS: These fix the "getValue" and "Cannot infer type" errors
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
-import androidx.compose.foundation.layout.size // For the progress indicator
+
 @Composable
 fun RegistrationStepA(
     viewModel: RegistrationViewModel,
@@ -23,7 +24,7 @@ fun RegistrationStepA(
     val username by viewModel.username.collectAsState()
     val displayName by viewModel.displayName.collectAsState()
     val isChecking by viewModel.isChecking.collectAsState()
-    val error by viewModel.usernameError.collectAsState()
+    val usernameError by viewModel.usernameError.collectAsState() // Linked to new VM variable
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp)
@@ -48,8 +49,8 @@ fun RegistrationStepA(
             onValueChange = { viewModel.onUsernameChange(it) },
             placeholder = { Text("@unique_handle") },
             modifier = Modifier.fillMaxWidth(),
-            isError = error != null,
-            supportingText = { error?.let { Text(it, color = Color.Red) } },
+            isError = usernameError != null, // Updated name
+            supportingText = { usernameError?.let { Text(it, color = Color.Red) } }, // Updated name
             singleLine = true
         )
 
@@ -61,8 +62,11 @@ fun RegistrationStepA(
             enabled = !isChecking && username.isNotEmpty() && displayName.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
         ) {
-            if (isChecking) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-            else Text("Next Step")
+            if (isChecking) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            } else {
+                Text("Next Step")
+            }
         }
 
         OutlinedButton(

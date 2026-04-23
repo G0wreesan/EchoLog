@@ -6,16 +6,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Home : Screen("home", "Home", Icons.Default.Home)
-    object Discovery : Screen("discovery", "Explore", Icons.Default.Search)
-    object Create : Screen("create", "Post", Icons.Default.AddCircle)
-    object Saved : Screen("saved", "Saved", Icons.Default.Favorite)
-    object Profile : Screen("profile", "Profile", Icons.Default.Person)
+    object Calendar : Screen("calendar", "Calendar", Icons.Default.DateRange)
+    object Create : Screen("create", "Add", Icons.Default.AddCircle) // The + Button
+    object Browse : Screen("browse", "Browse", Icons.Default.List)
+    object Profile : Screen("profile", "Vault", Icons.Default.Lock)
 }
 
 val bottomNavItems = listOf(
     Screen.Home,
-    Screen.Discovery,
+    Screen.Calendar,
     Screen.Create,
-    Screen.Saved,
+    Screen.Browse,
     Screen.Profile
 )
