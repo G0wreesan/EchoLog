@@ -11,6 +11,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import com.echolog.app.viewmodel.RegistrationViewModel
 import androidx.compose.runtime.getValue
 
@@ -104,7 +105,13 @@ fun LoginScreen(
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     enabled = !isChecking && identifier.isNotEmpty() && password.isNotEmpty(),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xCC3FC1FD),       // enabled (blue)
+                        contentColor = Color.Black,              // text color
+                        disabledContainerColor = Color(0xFFE0E0E0), // disabled (gray)
+                        disabledContentColor = Color.Gray        // disabled text
+                )
                 ) {
                     if (isChecking) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
