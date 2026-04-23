@@ -67,7 +67,7 @@ fun MainAppShell(
                 3 -> Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
                     Text("Browse Logs")
                 }
-                4 -> ProfileAndSettingsScreen(registrationViewModel, onLogout)
+                4 -> VaultScreen(registrationViewModel, onLogout)
             }
         }
     }
@@ -75,56 +75,7 @@ fun MainAppShell(
 
 
 
-@Composable
-fun ProfileAndSettingsScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
-    val username by viewModel.username.collectAsState()
-    val displayName by viewModel.displayName.collectAsState()
-    val selectedBitmap by viewModel.selectedBitmap.collectAsState()
-    val selectedRes by viewModel.selectedAvatarRes.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("My Profile", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Box(modifier = Modifier.size(110.dp).clip(CircleShape).background(Color.LightGray)) {
-            if (selectedBitmap != null) {
-                Image(bitmap = selectedBitmap!!.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else if (selectedRes != null) {
-                Image(painter = painterResource(id = selectedRes!!), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(displayName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("@$username", fontSize = 16.sp, color = Color.Gray)
-        Spacer(modifier = Modifier.height(40.dp))
-
-        SettingsRow(Icons.Default.Edit, "Edit Profile")
-        SettingsRow(Icons.Default.Notifications, "Notifications")
-        SettingsRow(Icons.Default.Lock, "Privacy & Security")
-        SettingsRow(Icons.Default.Info, "Help Center")
-
-        Spacer(modifier = Modifier.height(60.dp))
-
-        Button(
-            onClick = onLogout,
-            modifier = Modifier.fillMaxWidth().height(55.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE), contentColor = Color.Red),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Logout from EchoLog", fontWeight = FontWeight.Bold)
-        }
-    }
-}
 
 @Composable
 fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String) {

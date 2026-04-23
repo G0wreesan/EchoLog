@@ -149,28 +149,33 @@ class RegistrationViewModel @Inject constructor(
                 val user = supabase.auth.currentUserOrNull() ?: throw Exception("Auth session missing")
                 var finalAvatarUrl: String? = null
 
-                // 1. Storage Upload
-                _selectedBitmap.value?.let { bitmap ->
+                // 1. Handle Custom Bitmap (Gallery Upload)
+                if (_selectedBitmap.value != null) {
                     val stream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                    val byteArray = stream.toByteArray()
+                    _selectedBitmap.value!!.compress(Bitmap.CompressFormat.JPEG, 80, stream)
                     val fileName = "${user.id}_avatar.jpg"
                     val bucket = supabase.storage.from("avatars")
-                    bucket.upload(fileName, byteArray) { upsert = true }
+                    bucket.upload(fileName, stream.toByteArray()) { upsert = true }
                     finalAvatarUrl = bucket.publicUrl(fileName)
                 }
+                // 2. Handle Default Avatars (PNGs)
+                else if (_selectedAvatarRes.value != null) {
+                    // We store a special identifier or the resource name to know it's a local resource
+                    finalAvatarUrl = "local_res_${_selectedAvatarRes.value}"
+                }
 
-                // 2. Profiles Table only (Removing Preferences Table here)
+                // 3. Save to 'profiles' table
                 val profile = UserProfile(
                     id = user.id,
                     username = _username.value,
                     display_name = _displayName.value,
                     email = _email.value,
-                    date_of_birth = "2000-01-01", // Should ideally come from Step A
+                    date_of_birth = "2000-01-01", // Placeholder or get from State
                     avatar_url = finalAvatarUrl
                 )
-                supabase.postgrest.from("profiles").upsert(profile)
 
+                supabase.postgrest.from("profiles").upsert(profile)
+                _userProfile.value = profile // Update local state
                 onComplete()
             } catch (e: Exception) {
                 _authError.value = "Finalization failed: ${e.localizedMessage}"

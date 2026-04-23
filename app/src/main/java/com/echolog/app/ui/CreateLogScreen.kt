@@ -26,6 +26,7 @@ import androidx.core.content.FileProvider
 import coil3.compose.rememberAsyncImagePainter
 import com.echolog.app.viewmodel.LogViewModel
 import java.io.File
+import androidx.compose.foundation.shape.CircleShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,16 +173,23 @@ fun CreateLogScreen(
 
         Button(
             onClick = {
+
                 viewModel.saveNewLog(
                     title = title,
-                    caption = description,
+                    caption = description, // Matches your 'description' state
                     category = selectedCategory,
                     type = "memory",
-                    mediaPaths = selectedMediaPaths.toList()
+                    mediaPaths = selectedMediaPaths.toList(),
+
+                    colorHex = "#000000", // Or pass a dynamic color if you added a picker
+                    scheduledAt = null,    // Or pass your date state
+                    context = context      // This is the important one for file saving!
                 )
                 onSaveSuccess()
             },
-            modifier = Modifier.fillMaxWidth().height(55.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(55.dp),
             enabled = title.isNotBlank(),
             shape = RoundedCornerShape(14.dp)
         ) {
