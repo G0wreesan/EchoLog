@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -22,14 +23,26 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.echolog.app.R
 import com.echolog.app.util.isNetworkAvailable
+import com.echolog.app.viewmodel.LogViewModel
 import com.echolog.app.viewmodel.RegistrationViewModel
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VaultScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
+fun VaultScreen(
+    viewModel: RegistrationViewModel,
+    logViewModel: LogViewModel,
+    onLogout: () -> Unit
+) {
     val userProfile by viewModel.userProfile.collectAsState()
+    val isSyncing by logViewModel.isSyncing.collectAsState()
     val context = LocalContext.current
     val isOnline by isNetworkAvailable(context)
+
+    // State for Dialogs
+    var showEditProfile by remember { mutableStateOf(false) }
+    var showSupport by remember { mutableStateOf(false) }
+    var newDisplayName by remember { mutableStateOf("") }
 
     // Dynamic Greeting
     val greeting = remember {
@@ -38,6 +51,46 @@ fun VaultScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
             in 12..16 -> "Good Afternoon"
             else -> "Good Evening"
         }
+    }
+
+    // Edit Profile Dialog
+    if (showEditProfile) {
+        AlertDialog(
+            onDismissRequest = { showEditProfile = false },
+            title = { Text("Edit Display Name") },
+            text = {
+                OutlinedTextField(
+                    value = newDisplayName,
+                    onValueChange = { newDisplayName = it },
+                    placeholder = { Text(userProfile?.display_name ?: "Enter name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    // viewModel.updateDisplayName(newDisplayName) // Implement in RegistrationViewModel
+                    showEditProfile = false
+                }) { Text("Save", color = Color.Black) }
+            }
+        )
+    }
+
+    // Support Bottom Sheet / Dialog
+    if (showSupport) {
+        AlertDialog(
+            onDismissRequest = { showSupport = false },
+            title = { Text("App Support") },
+            text = {
+                Column {
+                    Text("• Memories are stored locally first.")
+                    Text("• Use 'Sync Now' to backup to the cloud.")
+                    Text("• Use the Vault to manage security.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSupport = false }) { Text("Close") }
+            }
+        )
     }
 
     Column(
@@ -59,7 +112,6 @@ fun VaultScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
                 Text("Your Vault", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
             }
 
-            // Connection Status Pill
             Surface(
                 color = if (isOnline) Color(0xFFF1F8E9) else Color(0xFFFFF1F1),
                 shape = RoundedCornerShape(20.dp)
@@ -74,13 +126,12 @@ fun VaultScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        // Profile Identity Card
+        // Profile Card
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(modifier = Modifier.size(100.dp)) {
-                // Profile Image Logic
                 val avatarUrl = userProfile?.avatar_url
                 if (avatarUrl?.startsWith("local_res_") == true) {
                     val resId = avatarUrl.removePrefix("local_res_").toIntOrNull() ?: R.drawable.avatar_1
@@ -107,17 +158,31 @@ fun VaultScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        // Settings Actions (Minimal List)
         Text("Account Settings", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
 
-        VaultActionRow(Icons.Default.Settings, "App Preferences")
-        VaultActionRow(Icons.Default.CloudSync, "Sync Data Now")
-        VaultActionRow(Icons.Default.VerifiedUser, "Security & Privacy")
-        VaultActionRow(Icons.Default.HelpOutline, "Support")
+        // Action Rows with Functionality
+        VaultActionRow(Icons.Default.Settings, "App Preferences") {
+            newDisplayName = userProfile?.display_name ?: ""
+            showEditProfile = true
+        }
+
+        VaultActionRow(
+            icon = Icons.Default.CloudSync,
+            label = if (isSyncing) "Syncing..." else "Sync Data Now"
+        ) {
+            if (isOnline) logViewModel.syncLocalLogsToSupabase()
+        }
+
+        VaultActionRow(Icons.Default.VerifiedUser, "Security & Privacy") {
+            // Navigate to security settings
+        }
+
+        VaultActionRow(Icons.Default.HelpOutline, "Support") {
+            showSupport = true
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Logout
         TextButton(
             onClick = onLogout,
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
@@ -130,11 +195,11 @@ fun VaultScreen(viewModel: RegistrationViewModel, onLogout: () -> Unit) {
 }
 
 @Composable
-fun VaultActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+fun VaultActionRow(icon: ImageVector, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable { onClick() }
             .padding(vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

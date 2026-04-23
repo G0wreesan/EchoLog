@@ -242,19 +242,47 @@ fun CreateLogScreen(
         }
 
         if (selectedMediaPaths.isNotEmpty()) {
-            LazyRow(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+            LazyRow(modifier = Modifier.fillMaxWidth().height(110.dp)) {
                 items(selectedMediaPaths) { path ->
-                    Box(Modifier.padding(end = 8.dp)) {
-                        Image(
-                            painter = rememberAsyncImagePainter(path),
-                            contentDescription = null,
-                            modifier = Modifier.size(100.dp).clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                    val isVideo = path.contains("video") || path.endsWith(".mp4")
+                    val isAudio = path.contains("VOICE") || path.endsWith(".mp3")
+
+                    Box(Modifier.padding(end = 12.dp).size(100.dp)) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF5F5F5),
+                            border = BorderStroke(1.dp, Color.LightGray)
+                        ) {
+                            when {
+                                isAudio -> {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                        Icon(Icons.Default.Mic, "Audio", modifier = Modifier.size(32.dp))
+                                        Text("Audio", fontSize = 10.sp)
+                                    }
+                                }
+                                isVideo -> {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        // You'd ideally use a thumbnail loader here
+                                        Icon(Icons.Default.PlayCircle, "Video", modifier = Modifier.size(32.dp))
+                                    }
+                                }
+                                else -> {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(path),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        }
+
+                        // Remove Button
                         IconButton(
                             onClick = { selectedMediaPaths.remove(path) },
-                            modifier = Modifier.align(Alignment.TopEnd).size(20.dp).background(Color.Black.copy(0.6f), CircleShape)
-                        ) { Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp)) }
+                            modifier = Modifier.align(Alignment.TopEnd).size(24.dp).offset(x = 8.dp, y = (-8).dp)
+                                .background(Color.Black, CircleShape)
+                        ) { Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(14.dp)) }
                     }
                 }
             }

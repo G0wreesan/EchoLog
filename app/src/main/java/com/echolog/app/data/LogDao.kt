@@ -15,5 +15,8 @@ interface LogDao {
     suspend fun markAsSynced(logId: String)
 
     @Query("SELECT * FROM logs WHERE isSynced = 0")
-    suspend fun getUnsyncedLogs(): List<LogEntity> // Added this
+    suspend fun getUnsyncedLogs(): List<LogEntity>
+
+    @Query("UPDATE logs SET isSynced = :status WHERE id = :id")
+    suspend fun updateSyncStatus(id: String, status: Boolean)
 }

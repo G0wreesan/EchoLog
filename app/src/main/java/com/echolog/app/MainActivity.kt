@@ -13,6 +13,7 @@ import com.echolog.app.ui.theme.EchoLogTheme
 import com.echolog.app.viewmodel.RegistrationViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.compose.BackHandler
+import com.echolog.app.viewmodel.LogViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
             EchoLogTheme {
                 var currentFlow by remember { mutableStateOf("LOGIN") }
                 val registrationViewModel: RegistrationViewModel = hiltViewModel()
+                val logViewModel: LogViewModel = hiltViewModel()
 
                 // Session Check on App Start
                 LaunchedEffect(Unit) {
@@ -86,7 +88,8 @@ class MainActivity : ComponentActivity() {
                         )
 
                         "MAIN" -> MainAppShell(
-                            registrationViewModel = registrationViewModel, // Use the new parameter name here
+                            registrationViewModel = registrationViewModel,
+                            logViewModel = logViewModel,
                             onLogout = {
                                 registrationViewModel.logout()
                                 currentFlow = "LOGIN"

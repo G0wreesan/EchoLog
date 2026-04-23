@@ -228,6 +228,26 @@ class RegistrationViewModel @Inject constructor(
         }
     }
 
+    fun updateDisplayName(newName: String) {
+        viewModelScope.launch {
+            try {
+                val user = supabase.auth.currentUserOrNull() ?: return@launch
+
+                // Update Supabase
+                supabase.postgrest.from("profiles").update({
+                    set("display_name", newName)
+                }) {
+                    filter { eq("id", user.id) }
+                }
+
+                // Refresh local profile state
+                fetchUserProfile()
+            } catch (e: Exception) {
+                _authError.value = "Update failed: ${e.localizedMessage}"
+            }
+        }
+    }
+
     fun logout() {
         viewModelScope.launch {
             supabase.auth.signOut()

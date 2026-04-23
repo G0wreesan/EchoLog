@@ -66,7 +66,11 @@ fun MainAppShell(
                 }
                 2 -> CreateLogScreen(logViewModel) { selectedTab = 0 }
                 3 -> BrowseScreen(logViewModel)
-                4 -> VaultScreen(registrationViewModel, onLogout)
+                4 -> VaultScreen(
+                    viewModel = registrationViewModel,
+                    logViewModel = logViewModel,
+                    onLogout = onLogout
+                )
             }
         }
     }

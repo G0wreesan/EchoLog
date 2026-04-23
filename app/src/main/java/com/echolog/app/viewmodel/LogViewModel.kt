@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import io.github.jan.supabase.postgrest.postgrest
+
 
 @HiltViewModel
 class LogViewModel @Inject constructor(
@@ -31,6 +33,9 @@ class LogViewModel @Inject constructor(
 
     private val _userCategories = MutableStateFlow(listOf("Study", "Work", "Workout", "Personal", "Travel", "General"))
     val userCategories = _userCategories.asStateFlow()
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing = _isSyncing.asStateFlow()
     fun addNewCategory(name: String) {
         if (!_userCategories.value.contains(name)) {
             _userCategories.value = _userCategories.value + name
@@ -52,6 +57,31 @@ class LogViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    fun syncLocalLogsToSupabase() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                // This now exists in the repository
+                val unsyncedLogs = repository.getUnsyncedLogs()
+
+                if (unsyncedLogs.isNotEmpty()) {
+                    // EXPLICIT TYPE: Passing <LogEntity> tells Supabase how to serialize it
+                    supabase.postgrest.from("logs").upsert<LogEntity>(unsyncedLogs)
+
+                    unsyncedLogs.forEach { log: LogEntity ->
+                        // Make sure 'id' matches the name in your LogEntity (e.g., log.id or log.logId)
+                        repository.updateSyncStatus(log.id, true)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Log the error specifically for Supabase debugging
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
 
     fun saveNewLog(
         title: String,

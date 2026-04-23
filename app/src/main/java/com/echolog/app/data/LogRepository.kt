@@ -34,6 +34,13 @@ class LogRepository @Inject constructor(
         }
     }
 
+    suspend fun getUnsyncedLogs(): List<LogEntity> {
+        return logDao.getUnsyncedLogs()
+    }
+    suspend fun updateSyncStatus(id: String, status: Boolean) {
+        logDao.updateSyncStatus(id, status)
+    }
+
     suspend fun syncPendingLogs() {
         val pending: List<LogEntity> = logDao.getUnsyncedLogs()
         pending.forEach { log: LogEntity ->
