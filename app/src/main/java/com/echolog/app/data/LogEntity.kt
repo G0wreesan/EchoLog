@@ -10,13 +10,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
-<<<<<<< Updated upstream
 import java.util.UUID
-import kotlinx.datetime.Instant
-=======
-import kotlinx.serialization.Transient
-
->>>>>>> Stashed changes
 
 @Entity(tableName = "logs")
 @Serializable
@@ -34,20 +28,12 @@ data class LogEntity(
     @SerialName("log_type")
     val logType: String,
 
-<<<<<<< Updated upstream
-=======
-    @Transient // Excluded from Supabase (Used kotlinx.serialization.Transient to avoid Room ignoring it)
-    val localMediaPaths: List<String> = emptyList(),
-
->>>>>>> Stashed changes
     @SerialName("image_urls")
     val remoteMediaUrls: List<String> = emptyList(),
 
-    // CHANGED TO STRING
     @SerialName("scheduled_at")
     val scheduledAt: String?,
 
-    // CHANGED TO STRING
     @SerialName("created_at")
     val createdAt: String = java.time.Instant.now().toString(),
 
@@ -60,10 +46,15 @@ data class LogEntity(
     @SerialName("has_reminder")
     val hasReminder: Boolean = false,
 
+    /**
+     * localMediaPaths needs to be visible to the Repository.
+     * @Ignore tells Room not to save it to the DB.
+     * @Transient tells Supabase/Serialization not to send it to the cloud.
+     */
     @Ignore @Transient
     val localMediaPaths: List<String> = emptyList()
 ) {
-    // UPDATED secondary constructor for Room to match String types
+    // Secondary constructor for Room (Room doesn't know what to do with the @Ignore field)
     constructor(
         id: String,
         userId: String,

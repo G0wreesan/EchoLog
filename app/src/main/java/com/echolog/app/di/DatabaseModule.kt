@@ -40,11 +40,9 @@ object DatabaseModule {
         logDao: LogDao,
         supabaseClient: SupabaseClient
     ): LogRepository {
-        // Pass all three parameters required by the LogRepository constructor
+        // Just pass the two arguments that the constructor actually expects
         return LogRepository(
             logDao = logDao,
-            postgrest = supabaseClient.postgrest,
-            supabase = supabaseClient
+            supabaseClient = supabaseClient
         )
-    }
-}
+    }}

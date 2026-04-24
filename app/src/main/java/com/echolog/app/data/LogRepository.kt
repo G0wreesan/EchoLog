@@ -3,7 +3,8 @@ package com.echolog.app.data
 import android.content.Context
 import android.net.Uri
 import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -11,65 +12,66 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
-import io.github.jan.supabase.auth.auth
 
 class LogRepository @Inject constructor(
     private val logDao: LogDao,
-    private val postgrest: Postgrest,
-    private val supabase: SupabaseClient
+    private val supabaseClient: SupabaseClient
 ) {
-    // Reference to your Supabase bucket
-    private val bucket = supabase.storage.from("vault")
+    private val postgrest = supabaseClient.postgrest
+    private val bucket = supabaseClient.storage.from("vault")
 
     fun getLogsForUser(userId: String): Flow<List<LogEntity>> = logDao.getLogsForUser(userId)
 
-    /**
-     * Main function to save log locally and sync to Supabase (Storage + Database)
-     */
     suspend fun saveAndSyncLog(log: LogEntity, context: Context) {
         withContext(Dispatchers.IO) {
             try {
-                // Check if user is logged in before starting
-                val userId = log.userId.ifBlank {
-                    supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                val currentUserId = log.userId.ifBlank {
+                    supabaseClient.auth.currentUserOrNull()?.id ?: "anonymous"
                 }
 
-                // 1. Save files to internal storage (Local persistence)
-                val internalPaths = log.localMediaPaths.map { uriString ->
-                    saveFileToInternalStorage(Uri.parse(uriString), context)
+                // 1. Save locally first to get internal paths
+                // Using a loop instead of .map to avoid suspension inference issues
+                val internalPaths = mutableListOf<String>()
+                for (path in log.localMediaPaths) {
+                    internalPaths.add(saveFileToInternalStorage(Uri.parse(path), context))
                 }
 
-                // 2. Upload files to Supabase Storage and get remote URLs
-                val remoteUrls = internalPaths.map { localPath ->
+                // 2. Upload to Supabase Storage
+                val remoteUrls = mutableListOf<String>()
+                for (localPath in internalPaths) {
                     val file = File(localPath)
-                    val fileName = "${log.userId}/${file.name}" // Organize bucket by userId
+                    val fileName = "$currentUserId/${file.name}"
 
-                    // Upload binary data
+                    // Explicitly calling the suspend function in the coroutine body
                     bucket.upload(path = fileName, data = file.readBytes()) {
                         upsert = true
                     }
-
-                    // Return the public URL for the database
-                    bucket.publicUrl(fileName)
+                    remoteUrls.add(bucket.publicUrl(fileName))
                 }
 
-                // 3. Create a final version of the log with all paths/URLs
-                val logToSave = log.copy(
-                    localMediaPaths = internalPaths,
+                // 3. Reconstruct LogEntity using the secondary constructor
+                // match the exact order of parameters in your LogEntity file
+                val logToSave = LogEntity(
+                    id = log.id,
+                    userId = log.userId,
+                    title = log.title,
+                    caption = log.caption,
+                    category = log.category,
+                    logType = log.logType,
                     remoteMediaUrls = remoteUrls,
-                    isSynced = false
+                    scheduledAt = log.scheduledAt,
+                    createdAt = log.createdAt,
+                    isSynced = false,
+                    colorHex = log.colorHex,
+                    hasReminder = log.hasReminder
                 )
 
-                // 4. Save to Local Room DB
+                // 4. Persistence operations
                 logDao.insertLog(logToSave)
-
-                // 5. Sync metadata to Supabase Postgrest
-                postgrest.from("logs").insert(logToSave)
-
-                // 6. Mark as synced locally
+                postgrest.from("logs").upsert(logToSave)
                 logDao.markAsSynced(logToSave.id)
 
-                android.util.Log.d("SYNC_SUCCESS", "Media uploaded and Log synced: ${logToSave.id}")
+                android.util.Log.d("SYNC_SUCCESS", "Log and Media synced: ${logToSave.id}")
 
             } catch (e: Exception) {
                 android.util.Log.e("SYNC_ERROR", "Step failed: ${e.localizedMessage}")
@@ -81,16 +83,11 @@ class LogRepository @Inject constructor(
     suspend fun syncPendingLogs() {
         val pending = logDao.getUnsyncedLogs()
         if (pending.isEmpty()) return
-
         try {
-            // Note: This logic assumes media is already uploaded or is handled
-            // in a background worker. For now, it upserts the metadata.
             postgrest.from("logs").upsert(pending)
-            pending.forEach { log ->
-                logDao.markAsSynced(log.id)
-            }
+            pending.forEach { log -> logDao.markAsSynced(log.id) }
         } catch (e: Exception) {
-            android.util.Log.e("SYNC_ERROR", "Supabase sync failed: ${e.message}")
+            android.util.Log.e("SYNC_ERROR", "Sync failed: ${e.message}")
         }
     }
 
