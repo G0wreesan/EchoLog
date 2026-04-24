@@ -8,6 +8,9 @@ interface LogDao {
     @Query("SELECT * FROM logs WHERE userId = :userId ORDER BY createdAt DESC")
     fun getLogsForUser(userId: String): Flow<List<LogEntity>>
 
+    @Query("SELECT * FROM logs WHERE userId = :userId AND createdAt LIKE :datePrefix || '%' ORDER BY createdAt DESC")
+    fun getLogsByDate(userId: String, datePrefix: String): Flow<List<LogEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: LogEntity)
 

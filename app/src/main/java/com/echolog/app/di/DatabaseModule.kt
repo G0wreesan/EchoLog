@@ -38,8 +38,13 @@ object DatabaseModule {
     @Singleton
     fun provideLogRepository(
         logDao: LogDao,
-        supabaseClient: SupabaseClient // Use the Client to get Postgrest
+        supabaseClient: SupabaseClient
     ): LogRepository {
-        return LogRepository(logDao, supabaseClient.postgrest)
+        // Pass all three parameters required by the LogRepository constructor
+        return LogRepository(
+            logDao = logDao,
+            postgrest = supabaseClient.postgrest,
+            supabase = supabaseClient
+        )
     }
 }

@@ -27,14 +27,14 @@ import com.echolog.app.viewmodel.RegistrationViewModel
 
 @Composable
 fun MainAppShell(
-    registrationViewModel: RegistrationViewModel, // Renamed for clarity
-    logViewModel: LogViewModel = hiltViewModel(), // Injected here
+    registrationViewModel: RegistrationViewModel,
+    logViewModel: LogViewModel = hiltViewModel(),
     onLogout: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
-        containerColor = Color(0xCC3FC1FD), // ✅ App background color
+        containerColor = Color(0xCC3FC1FD),
         bottomBar = {
             NavigationBar(
                 containerColor = Color(0xCC3FC1FD),
@@ -62,21 +62,19 @@ fun MainAppShell(
             }
         }
     ) { padding ->
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xCC3FC1FD)) // ✅ ensures full background coverage
+                .background(Color(0xCC3FC1FD))
                 .padding(padding)
         ) {
             when (selectedTab) {
-                0 -> HomeScreen(logViewModel)
-                1 -> Column(
-                    Modifier.fillMaxSize(),
-                    Arrangement.Center,
-                    Alignment.CenterHorizontally
-                ) {
-                    Text("Calendar View Coming Soon")
+                // FIXED: Now passing both ViewModels to HomeScreen
+                0 -> HomeScreen(logViewModel, registrationViewModel)
+
+                1 -> CalendarScreen(logViewModel) { date ->
+                    logViewModel.updateSelectedDate(date)
+                    selectedTab = 2
                 }
                 2 -> CreateLogScreen(logViewModel) { selectedTab = 0 }
                 3 -> BrowseScreen(logViewModel)

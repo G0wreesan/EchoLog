@@ -9,18 +9,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import io.github.jan.supabase.postgrest.postgrest
-
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import javax.inject.Inject
 
 @HiltViewModel
 class LogViewModel @Inject constructor(
@@ -34,22 +29,27 @@ class LogViewModel @Inject constructor(
     private val _userCategories = MutableStateFlow(listOf("Study", "Work", "Workout", "Personal", "Travel", "General"))
     val userCategories = _userCategories.asStateFlow()
 
+    private val _selectedCalendarDate = MutableStateFlow(LocalDate.now())
+    val selectedCalendarDate = _selectedCalendarDate.asStateFlow()
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
+
     fun addNewCategory(name: String) {
         if (!_userCategories.value.contains(name)) {
             _userCategories.value = _userCategories.value + name
-            // Optional: Save to Supabase 'user_preferences' table here
         }
     }
+
+    // Explicitly typed flatMapLatest to avoid inference errors
     @OptIn(ExperimentalCoroutinesApi::class)
     val recentLogs: StateFlow<List<LogEntity>> = supabase.auth.sessionStatus
-        .flatMapLatest { status ->
+        .flatMapLatest { status: SessionStatus ->
             if (status is SessionStatus.Authenticated) {
-                // Fetch logs using the ID from the active session
-                repository.getLogsForUser(status.session.user?.id ?: "")
+                val userId = status.session.user?.id ?: ""
+                repository.getLogsForUser(userId)
             } else {
-                flowOf(emptyList())
+                flowOf(emptyList<LogEntity>()) // Explicitly provide type
             }
         }
         .stateIn(
@@ -58,26 +58,26 @@ class LogViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    fun syncLocalLogsToSupabase() {
-        viewModelScope.launch {
-            _isSyncing.value = true
-            try {
-                val unsyncedLogs = repository.getUnsyncedLogs()
-                if (unsyncedLogs.isNotEmpty()) {
-                    // Correct syntax for the latest SDK
-                    supabase.postgrest.from("logs").upsert(unsyncedLogs)
+    fun updateSelectedDate(date: LocalDate) {
+        _selectedCalendarDate.value = date
+    }
 
-                    unsyncedLogs.forEach { log ->
-                        repository.updateSyncStatus(log.id, true)
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("LogViewModel", "Sync Error: ${e.localizedMessage}")
-            } finally {
-                _isSyncing.value = false
+    // Explicitly typed flatMapLatest for Calendar logs
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val calendarLogs: StateFlow<List<LogEntity>> = _selectedCalendarDate
+        .flatMapLatest { date: LocalDate ->
+            val userId = currentUserId
+            if (userId != null) {
+                repository.getLogsByDate(userId, date.toString())
+            } else {
+                flowOf(emptyList<LogEntity>()) // Explicitly provide type
             }
         }
-    }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     fun saveNewLog(
         title: String,
@@ -86,14 +86,13 @@ class LogViewModel @Inject constructor(
         type: String,
         mediaPaths: List<String>,
         colorHex: String = "#000000",
-        scheduledAt: Long? = null, // UI still gives us a Long
+        scheduledAt: Long? = null,
         context: Context
     ) {
         val userId = currentUserId ?: return
 
-        // Convert Long? to ISO String?
         val isoScheduledAt = scheduledAt?.let {
-            java.time.Instant.ofEpochMilli(it).toString()
+            Instant.ofEpochMilli(it).toString()
         }
 
         viewModelScope.launch {
@@ -104,12 +103,31 @@ class LogViewModel @Inject constructor(
                 category = category,
                 logType = type,
                 localMediaPaths = mediaPaths,
-                scheduledAt = isoScheduledAt, // Matches new String? type
-                createdAt = java.time.Instant.now().toString(), // Matches new String type
+                scheduledAt = isoScheduledAt,
+                createdAt = Instant.now().toString(),
                 isSynced = false,
                 colorHex = colorHex
             )
             repository.saveAndSyncLog(newLog, context)
+        }
+    }
+
+    fun syncLocalLogsToSupabase() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                val unsyncedLogs = repository.getUnsyncedLogs()
+                if (unsyncedLogs.isNotEmpty()) {
+                    supabase.postgrest.from("logs").upsert(unsyncedLogs)
+                    unsyncedLogs.forEach { log ->
+                        repository.updateSyncStatus(log.id, true)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LogViewModel", "Sync Error: ${e.localizedMessage}")
+            } finally {
+                _isSyncing.value = false
+            }
         }
     }
 

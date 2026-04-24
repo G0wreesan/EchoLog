@@ -51,10 +51,17 @@ fun CreateLogScreen(
     var newCategoryInput by remember { mutableStateOf("") }
 
     // Date/Reminder State
-    var scheduledAt by remember { mutableStateOf<Long?>(null) }
+
     val datePickerState = rememberDatePickerState()
     var showDatePicker by remember { mutableStateOf(false) }
 
+    val preSelectedDate = viewModel.selectedCalendarDate.collectAsState().value
+    val initialTimestamp = preSelectedDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    // This single variable now handles both manual picking and calendar selection
+    var scheduledAt by remember {
+        mutableStateOf(if (initialTimestamp > System.currentTimeMillis()) initialTimestamp else null)
+    }
     // Media State
     val selectedMediaPaths = remember { mutableStateListOf<String>() }
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
