@@ -29,28 +29,34 @@ class LogRepository @Inject constructor(
                     supabaseClient.auth.currentUserOrNull()?.id ?: "anonymous"
                 }
 
-                // 1. Save locally first to get internal paths
-                // Using a loop instead of .map to avoid suspension inference issues
+                // 1. Save new local files to internal storage
                 val internalPaths = mutableListOf<String>()
                 for (path in log.localMediaPaths) {
-                    internalPaths.add(saveFileToInternalStorage(Uri.parse(path), context))
+                    if (path.isNotEmpty() && !path.startsWith("http")) { // Only process local URIs
+                        internalPaths.add(saveFileToInternalStorage(Uri.parse(path), context))
+                    }
                 }
 
                 // 2. Upload to Supabase Storage
-                val remoteUrls = mutableListOf<String>()
+                val newRemoteUrls = mutableListOf<String>()
                 for (localPath in internalPaths) {
                     val file = File(localPath)
-                    val fileName = "$currentUserId/${file.name}"
+                    if (file.exists()) {
+                        val fileName = "$currentUserId/${file.name}"
 
-                    // Explicitly calling the suspend function in the coroutine body
-                    bucket.upload(path = fileName, data = file.readBytes()) {
-                        upsert = true
+                        // Upload binary data (Works for .jpg, .mp4, .mp3)
+                        bucket.upload(path = fileName, data = file.readBytes()) {
+                            upsert = true
+                        }
+
+                        // Get the public URL
+                        val publicUrl = bucket.publicUrl(fileName)
+                        newRemoteUrls.add(publicUrl)
                     }
-                    remoteUrls.add(bucket.publicUrl(fileName))
                 }
 
-                // 3. Reconstruct LogEntity using the secondary constructor
-                // match the exact order of parameters in your LogEntity file
+                // 3. Reconstruct LogEntity
+                // We combine existing remote URLs with the new ones we just uploaded
                 val logToSave = LogEntity(
                     id = log.id,
                     userId = log.userId,
@@ -58,7 +64,7 @@ class LogRepository @Inject constructor(
                     caption = log.caption,
                     category = log.category,
                     logType = log.logType,
-                    remoteMediaUrls = remoteUrls,
+                    remoteMediaUrls = (log.remoteMediaUrls + newRemoteUrls).distinct(),
                     scheduledAt = log.scheduledAt,
                     createdAt = log.createdAt,
                     isSynced = false,
@@ -71,11 +77,10 @@ class LogRepository @Inject constructor(
                 postgrest.from("logs").upsert(logToSave)
                 logDao.markAsSynced(logToSave.id)
 
-                android.util.Log.d("SYNC_SUCCESS", "Log and Media synced: ${logToSave.id}")
+                android.util.Log.d("SYNC_SUCCESS", "Synced ${newRemoteUrls.size} new media files.")
 
             } catch (e: Exception) {
                 android.util.Log.e("SYNC_ERROR", "Step failed: ${e.localizedMessage}")
-                e.printStackTrace()
             }
         }
     }

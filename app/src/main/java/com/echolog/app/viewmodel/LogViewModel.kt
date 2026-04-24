@@ -111,6 +111,13 @@ class LogViewModel @Inject constructor(
             repository.saveAndSyncLog(newLog, context)
         }
     }
+    fun saveAndSyncLog(log: LogEntity, context: Context) {
+        viewModelScope.launch {
+            // This ensures that when you edit a caption or add a photo in BrowseScreen,
+            // it goes through the full Media + Database pipeline.
+            repository.saveAndSyncLog(log, context)
+        }
+    }
 
     fun syncLocalLogsToSupabase() {
         viewModelScope.launch {
