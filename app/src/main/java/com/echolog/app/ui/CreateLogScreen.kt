@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import coil3.compose.rememberAsyncImagePainter
 import com.echolog.app.util.AudioRecorder
+import com.echolog.app.util.FileStorageHelper
 import com.echolog.app.viewmodel.LogViewModel
 import java.io.File
 
@@ -39,18 +40,14 @@ fun CreateLogScreen(
 ) {
     val context = LocalContext.current
 
-    // ===== UI State =====
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
 
-    // Category Logic
     val userCategories by viewModel.userCategories.collectAsState()
-    var selectedCategory by remember { mutableStateOf<String>(userCategories.firstOrNull() ?: "General") }
+    var selectedCategory by remember { mutableStateOf(userCategories.firstOrNull() ?: "General") }
     var expanded by remember { mutableStateOf(false) }
     var showNewCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryInput by remember { mutableStateOf("") }
-
-    // Date/Reminder State
 
     val datePickerState = rememberDatePickerState()
     var showDatePicker by remember { mutableStateOf(false) }
@@ -58,48 +55,101 @@ fun CreateLogScreen(
     val preSelectedDate = viewModel.selectedCalendarDate.collectAsState().value
     val initialTimestamp = preSelectedDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-    // This single variable now handles both manual picking and calendar selection
     var scheduledAt by remember {
-        mutableStateOf(if (initialTimestamp > System.currentTimeMillis()) initialTimestamp else null)
+        mutableStateOf<Long?>(if (initialTimestamp > System.currentTimeMillis()) initialTimestamp else null)
     }
-    // Media State
-    val selectedMediaPaths = remember { mutableStateListOf<String>() }
+
+    // STATE ARRAYS FOR SEPARATE MEDIA CHANNELS
+    val selectedImages = remember { mutableStateListOf<String>() }
+    val selectedAudios = remember { mutableStateListOf<String>() }
+    val selectedVideos = remember { mutableStateListOf<String>() }
+
+    var tempPhotoFile by remember { mutableStateOf<File?>(null) }
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     val recorder = remember { AudioRecorder(context) }
     var audioFile by remember { mutableStateOf<File?>(null) }
 
-    // ===== Launchers (Order Matters!) =====
+    val isSaving by viewModel.isSaving.collectAsState()
 
-    // 1. Camera Launcher (Defined first)
+    LaunchedEffect(Unit) {
+        viewModel.saveFinished.collect { finished ->
+            if (finished) {
+                onSaveSuccess()
+            }
+        }
+    }
+
+    // Camera Callback Launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success) tempPhotoUri?.let { selectedMediaPaths.add(it.toString()) }
+        if (success && tempPhotoFile != null) {
+            try {
+                // Define your permanent location inside filesDir/media
+                val targetFolder = File(context.filesDir, "media").apply { mkdirs() }
+                val permanentFile = File(targetFolder, "IMG_${System.currentTimeMillis()}.jpg")
+
+                // Stream the bytes from external storage directly into permanent internal storage
+                tempPhotoFile?.inputStream()?.use { input ->
+                    permanentFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+
+                // Add the absolute path to your state array
+                selectedImages.add(permanentFile.absolutePath)
+
+                // Clean up the temporary external file so it doesn't waste user device storage
+                if (tempPhotoFile!!.exists()) {
+                    tempPhotoFile!!.delete()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Fallback gracefully to external storage location if internal copy fails
+                selectedImages.add(tempPhotoFile!!.absolutePath)
+            }
+        }
     }
 
-    // 2. Permission Launcher (Can now reference cameraLauncher)
+    // Combined Permission Launcher for both Camera and Audio Notes
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
         val cameraGranted = perms[Manifest.permission.CAMERA] == true
-        val micGranted = perms[Manifest.permission.RECORD_AUDIO] == true
+        val audioGranted = perms[Manifest.permission.RECORD_AUDIO] == true
 
         if (cameraGranted) {
-            // Safe to create file and launch camera here
             val file = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "IMG_${System.currentTimeMillis()}.jpg")
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            tempPhotoFile = file
             tempPhotoUri = uri
             cameraLauncher.launch(uri)
-        } else if (perms.containsKey(Manifest.permission.CAMERA)) {
-            Toast.makeText(context, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show()
+        } else if (audioGranted) {
+            // Permission for audio was granted from the button click stream
+            val targetDir = File(context.filesDir, "media").apply { mkdirs() }
+            val file = File(targetDir, "VOICE_${System.currentTimeMillis()}.m4a")
+            audioFile = file
+            recorder.startRecording(file)
+            isRecording = true
+        } else {
+            Toast.makeText(context, "Required feature permissions were denied", Toast.LENGTH_SHORT).show()
         }
     }
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { selectedMediaPaths.add(it.toString()) } }
-    val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { selectedMediaPaths.add(it.toString()) } }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            val permanentPath = FileStorageHelper.saveFileToInternalStorage(context, it.toString(), "IMG", "jpg")
+            selectedImages.add(permanentPath)
+        }
+    }
+    val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            val permanentPath = FileStorageHelper.saveFileToInternalStorage(context, it.toString(), "VID", "mp4")
+            selectedVideos.add(permanentPath)
+        }
+    }
 
-    // ===== Dialogs =====
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -121,7 +171,6 @@ fun CreateLogScreen(
                     value = newCategoryInput,
                     onValueChange = { newCategoryInput = it },
                     label = { Text("Category Name") }
-
                 )
             },
             confirmButton = {
@@ -137,7 +186,6 @@ fun CreateLogScreen(
         )
     }
 
-    // ===== Main UI =====
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -145,12 +193,7 @@ fun CreateLogScreen(
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text(
-            "Create Entry",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color(0xCC3FC1FD)
-        )
+        Text("Create Entry", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xCC3FC1FD))
         Spacer(modifier = Modifier.height(20.dp))
 
         OutlinedTextField(
@@ -164,7 +207,6 @@ fun CreateLogScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Category Dropdown
         ExposedDropdownMenuBox(
             expanded = expanded,
             onExpandedChange = { expanded = !expanded }
@@ -176,7 +218,7 @@ fun CreateLogScreen(
                 textStyle = LocalTextStyle.current.copy(color = Color.Black),
                 label = { Text("Category") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xCC3FC1FD))
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -220,30 +262,25 @@ fun CreateLogScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("Add Media", fontWeight = FontWeight.Bold,color = Color(0xCC3FC1FD))
+        Text("Add Media", fontWeight = FontWeight.Bold, color = Color(0xCC3FC1FD))
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // FIXED CAMERA BUTTON
             IconButton(onClick = {
+                // FIXED: Safety check permissions framework before opening the camera
                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
-            }) {
-                Icon(Icons.Default.PhotoCamera, null, tint = Color.Black)
-            }
+            }) { Icon(Icons.Default.PhotoCamera, null, tint = Color.Black) }
 
             IconButton(
                 onClick = {
-                    permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                     if (!isRecording) {
-                        val file = File(context.cacheDir, "VOICE_${System.currentTimeMillis()}.mp3")
-                        audioFile = file
-                        recorder.startRecording(file)
-                        isRecording = true
+                        // FIXED: Handled with internal callback loop architecture to stop sudden app runtime execution crashes
+                        permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                     } else {
                         recorder.stopRecording()
                         isRecording = false
-                        audioFile?.let { selectedMediaPaths.add(Uri.fromFile(it).toString()) }
+                        audioFile?.let { selectedAudios.add(it.absolutePath) }
                     }
                 },
                 modifier = Modifier.background(if (isRecording) Color.Red else Color.Transparent, CircleShape)
@@ -258,11 +295,13 @@ fun CreateLogScreen(
             }
         }
 
-        if (selectedMediaPaths.isNotEmpty()) {
+        val allDraftMedia = selectedImages + selectedAudios + selectedVideos
+
+        if (allDraftMedia.isNotEmpty()) {
             LazyRow(modifier = Modifier.fillMaxWidth().height(110.dp)) {
-                items(selectedMediaPaths) { path ->
-                    val isVideo = path.contains("video") || path.endsWith(".mp4")
-                    val isAudio = path.contains("VOICE") || path.endsWith(".mp3")
+                items(allDraftMedia) { path ->
+                    val isVideo = selectedVideos.contains(path)
+                    val isAudio = selectedAudios.contains(path)
 
                     Box(Modifier.padding(end = 12.dp).size(100.dp)) {
                         Surface(
@@ -275,18 +314,17 @@ fun CreateLogScreen(
                                 isAudio -> {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                         Icon(Icons.Default.Mic, "Audio", modifier = Modifier.size(32.dp))
-                                        Text("Audio", fontSize = 10.sp)
+                                        Text("Audio Note", fontSize = 10.sp)
                                     }
                                 }
                                 isVideo -> {
                                     Box(contentAlignment = Alignment.Center) {
-                                        // You'd ideally use a thumbnail loader here
                                         Icon(Icons.Default.PlayCircle, "Video", modifier = Modifier.size(32.dp))
                                     }
                                 }
                                 else -> {
                                     Image(
-                                        painter = rememberAsyncImagePainter(path),
+                                        painter = rememberAsyncImagePainter(File(path)),
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop
                                     )
@@ -294,11 +332,13 @@ fun CreateLogScreen(
                             }
                         }
 
-                        // Remove Button
                         IconButton(
-                            onClick = { selectedMediaPaths.remove(path) },
-                            modifier = Modifier.align(Alignment.TopEnd).size(24.dp).offset(x = 8.dp, y = (-8).dp)
-                                .background(Color.Black, CircleShape)
+                            onClick = {
+                                selectedImages.remove(path)
+                                selectedAudios.remove(path)
+                                selectedVideos.remove(path)
+                            },
+                            modifier = Modifier.align(Alignment.TopEnd).size(24.dp).offset(x = 8.dp, y = (-8).dp).background(Color.Black, CircleShape)
                         ) { Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(14.dp)) }
                     }
                 }
@@ -309,20 +349,34 @@ fun CreateLogScreen(
 
         Button(
             onClick = {
-                viewModel.saveNewLog(
+                // Safety: If still recording, stop and save the track before final log commit
+                if (isRecording) {
+                    recorder.stopRecording()
+                    isRecording = false
+                    audioFile?.let { selectedAudios.add(it.absolutePath) }
+                }
+
+                viewModel.saveNewLogCategorized(
                     title = title,
                     caption = description,
                     category = selectedCategory,
-                    type = "memory",
-                    mediaPaths = selectedMediaPaths.toList(),
+                    imagePaths = selectedImages.toList(),
+                    audioPaths = selectedAudios.toList(),
+                    videoPaths = selectedVideos.toList(),
                     scheduledAt = scheduledAt,
                     context = context
                 )
-                onSaveSuccess()
             },
+            enabled = !isSaving,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC3FC1FD)),
             shape = RoundedCornerShape(16.dp)
-        ) { Text("Save Entry", fontWeight = FontWeight.Bold) }
+        ) {
+            if (isSaving) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            } else {
+                Text("Save Entry", fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }

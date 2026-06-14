@@ -1,98 +1,108 @@
 package com.echolog.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.Ignore
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Transient
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
-import java.util.UUID
 
-@Entity(tableName = "logs")
 @Serializable
+@Entity(tableName = "logs")
 data class LogEntity(
-    @PrimaryKey
-    val id: String = UUID.randomUUID().toString(),
-
-    @SerialName("user_id")
+    @PrimaryKey 
+    val id: String = java.util.UUID.randomUUID().toString(),
+    
+    @SerialName("user_id") 
+    @ColumnInfo(name = "user_id")
     val userId: String,
-
+    
     val title: String,
     val caption: String?,
     val category: String,
-
-    @SerialName("log_type")
+    
+    @SerialName("log_type") 
+    @ColumnInfo(name = "log_type")
     val logType: String,
 
-    @SerialName("image_urls")
-    val remoteMediaUrls: List<String> = emptyList(),
+    // Local device sandbox tracking arrays - Marked @Transient to exclude from Supabase Postgrest serialization
+    @Transient
+    @SerialName("local_image_paths") 
+    @ColumnInfo(name = "local_image_paths")
+    val localImagePaths: List<String> = emptyList(),
+    
+    @Transient
+    @SerialName("local_audio_paths") 
+    @ColumnInfo(name = "local_audio_paths")
+    val localAudioPaths: List<String> = emptyList(),
+    
+    @Transient
+    @SerialName("local_video_paths") 
+    @ColumnInfo(name = "local_video_paths")
+    val localVideoPaths: List<String> = emptyList(),
 
-    @SerialName("scheduled_at")
-    val scheduledAt: String?,
+    // Remote Supabase storage public URL bucket links
+    @SerialName("remote_image_urls") 
+    @ColumnInfo(name = "remote_image_urls")
+    val remoteImageUrls: List<String> = emptyList(),
+    
+    @SerialName("remote_audio_urls") 
+    @ColumnInfo(name = "remote_audio_urls")
+    val remoteAudioUrls: List<String> = emptyList(),
+    
+    @SerialName("remote_video_urls") 
+    @ColumnInfo(name = "remote_video_urls")
+    val remoteVideoUrls: List<String> = emptyList(),
 
-    @SerialName("created_at")
-    val createdAt: String = java.time.Instant.now().toString(),
+    @SerialName("scheduled_at") 
+    @ColumnInfo(name = "scheduled_at")
+    val scheduledAt: String? = null,
+    
+    @SerialName("created_at") 
+    @ColumnInfo(name = "created_at")
+    val createdAt: String,
 
-    @SerialName("is_synced")
+    @SerialName("is_synced") 
+    @ColumnInfo(name = "is_synced")
     val isSynced: Boolean = false,
+    
+    @SerialName("color_hex") 
+    @ColumnInfo(name = "color_hex")
+    val colorHex: String = "#000000"
+)
 
-    @SerialName("notif_color")
-    val colorHex: String = "#000000",
+/**
+ * Remote-specific representation of a Log to avoid sending local paths to Supabase.
+ */
+@Serializable
+data class LogRemoteEntity(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val title: String,
+    val caption: String?,
+    val category: String,
+    @SerialName("log_type") val logType: String,
+    @SerialName("remote_image_urls") val remoteImageUrls: List<String>,
+    @SerialName("remote_audio_urls") val remoteAudioUrls: List<String>,
+    @SerialName("remote_video_urls") val remoteVideoUrls: List<String>,
+    @SerialName("scheduled_at") val scheduledAt: String?,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("is_synced") val isSynced: Boolean,
+    @SerialName("color_hex") val colorHex: String
+)
 
-    @SerialName("has_reminder")
-    val hasReminder: Boolean = false,
-
-    /**
-     * localMediaPaths needs to be visible to the Repository.
-     * @Ignore tells Room not to save it to the DB.
-     * @Transient tells Supabase/Serialization not to send it to the cloud.
-     */
-    @Ignore @Transient
-    val localMediaPaths: List<String> = emptyList()
-) {
-    // Secondary constructor for Room (Room doesn't know what to do with the @Ignore field)
-    constructor(
-        id: String,
-        userId: String,
-        title: String,
-        caption: String?,
-        category: String,
-        logType: String,
-        remoteMediaUrls: List<String>,
-        scheduledAt: String?,
-        createdAt: String,
-        isSynced: Boolean,
-        colorHex: String,
-        hasReminder: Boolean
-    ) : this(
-        id = id,
-        userId = userId,
-        title = title,
-        caption = caption,
-        category = category,
-        logType = logType,
-        remoteMediaUrls = remoteMediaUrls,
-        scheduledAt = scheduledAt,
-        createdAt = createdAt,
-        isSynced = isSynced,
-        colorHex = colorHex,
-        hasReminder = hasReminder,
-        localMediaPaths = emptyList()
-    )
-}
-
-class Converters {
-    @TypeConverter
-    fun fromList(value: List<String>): String = Json.encodeToString(value)
-
-    @TypeConverter
-    fun toList(value: String): List<String> = try {
-        Json.decodeFromString(value)
-    } catch (e: Exception) {
-        emptyList()
-    }
-}
+fun LogEntity.toRemote() = LogRemoteEntity(
+    id = id,
+    userId = userId,
+    title = title,
+    caption = caption,
+    category = category,
+    logType = logType,
+    remoteImageUrls = remoteImageUrls,
+    remoteAudioUrls = remoteAudioUrls,
+    remoteVideoUrls = remoteVideoUrls,
+    scheduledAt = scheduledAt,
+    createdAt = createdAt,
+    isSynced = isSynced,
+    colorHex = colorHex
+)

@@ -25,71 +25,75 @@ class LogRepository @Inject constructor(
     suspend fun saveAndSyncLog(log: LogEntity, context: Context) {
         withContext(Dispatchers.IO) {
             try {
-                val currentUserId = log.userId.ifBlank {
+                val currentUserId = if (log.userId.isBlank() || log.userId == "anonymous") {
                     supabaseClient.auth.currentUserOrNull()?.id ?: "anonymous"
+                } else {
+                    log.userId
                 }
 
-                // 1. Save new local files to internal storage
-                val internalPaths = mutableListOf<String>()
-                for (path in log.localMediaPaths) {
-                    if (path.isNotEmpty() && !path.startsWith("http")) { // Only process local URIs
-                        internalPaths.add(saveFileToInternalStorage(Uri.parse(path), context))
-                    }
-                }
+                // 1. Upload Files to Supabase Storage Buckets
+                // We use the local paths already stored in the log object
+                val newRemoteImages = uploadFilesToBucket(log.localImagePaths, currentUserId)
+                val newRemoteAudios = uploadFilesToBucket(log.localAudioPaths, currentUserId)
+                val newRemoteVideos = uploadFilesToBucket(log.localVideoPaths, currentUserId)
 
-                // 2. Upload to Supabase Storage
-                val newRemoteUrls = mutableListOf<String>()
-                for (localPath in internalPaths) {
-                    val file = File(localPath)
-                    if (file.exists()) {
-                        val fileName = "$currentUserId/${file.name}"
-
-                        // Upload binary data (Works for .jpg, .mp4, .mp3)
-                        bucket.upload(path = fileName, data = file.readBytes()) {
-                            upsert = true
-                        }
-
-                        // Get the public URL
-                        val publicUrl = bucket.publicUrl(fileName)
-                        newRemoteUrls.add(publicUrl)
-                    }
-                }
-
-                // 3. Reconstruct LogEntity
-                // We combine existing remote URLs with the new ones we just uploaded
-                val logToSave = LogEntity(
-                    id = log.id,
-                    userId = log.userId,
-                    title = log.title,
-                    caption = log.caption,
-                    category = log.category,
-                    logType = log.logType,
-                    remoteMediaUrls = (log.remoteMediaUrls + newRemoteUrls).distinct(),
-                    scheduledAt = log.scheduledAt,
-                    createdAt = log.createdAt,
-                    isSynced = false,
-                    colorHex = log.colorHex,
-                    hasReminder = log.hasReminder
+                // 2. Build completely type-safe LogEntity model representation
+                val logToSave = log.copy(
+                    userId = currentUserId,
+                    remoteImageUrls = (log.remoteImageUrls + newRemoteImages).distinct(),
+                    remoteAudioUrls = (log.remoteAudioUrls + newRemoteAudios).distinct(),
+                    remoteVideoUrls = (log.remoteVideoUrls + newRemoteVideos).distinct(),
+                    isSynced = false
                 )
 
-                // 4. Persistence operations
+                // 3. Save locally to Room database
                 logDao.insertLog(logToSave)
-                postgrest.from("logs").upsert(logToSave)
-                logDao.markAsSynced(logToSave.id)
 
-                android.util.Log.d("SYNC_SUCCESS", "Synced ${newRemoteUrls.size} new media files.")
+                // 4. Upsert to Supabase Postgrest if not anonymous
+                if (currentUserId != "anonymous") {
+                    try {
+                        postgrest.from("logs").upsert(logToSave.toRemote())
+                        logDao.markAsSynced(logToSave.id)
+                        android.util.Log.d("SYNC_SUCCESS", "Synced to Supabase successfully.")
+                    } catch (e: Exception) {
+                        android.util.Log.e("SYNC_ERROR", "Supabase upsert failed: ${e.localizedMessage}")
+                    }
+                }
 
             } catch (e: Exception) {
-                android.util.Log.e("SYNC_ERROR", "Step failed: ${e.localizedMessage}")
+                android.util.Log.e("SYNC_ERROR", "Global save failed: ${e.localizedMessage}")
             }
         }
+    }
+
+    private suspend fun uploadFilesToBucket(filePaths: List<String>, userId: String): List<String> {
+        val uploadedUrls = mutableListOf<String>()
+        for (localPath in filePaths) {
+            if (localPath.startsWith("http")) {
+                uploadedUrls.add(localPath)
+                continue
+            }
+            val file = File(localPath)
+            if (file.exists()) {
+                try {
+                    val fileName = "$userId/${file.name}"
+                    bucket.upload(path = fileName, data = file.readBytes()) {
+                        upsert = true
+                    }
+                    uploadedUrls.add(bucket.publicUrl(fileName))
+                } catch (e: Exception) {
+                    android.util.Log.e("UPLOAD_ERROR", "Failed to upload ${file.name}: ${e.message}")
+                }
+            }
+        }
+        return uploadedUrls
     }
 
     suspend fun syncPendingLogs() {
         val pending = logDao.getUnsyncedLogs()
         if (pending.isEmpty()) return
         try {
-            postgrest.from("logs").upsert(pending)
+            postgrest.from("logs").upsert(pending.map { it.toRemote() })
             pending.forEach { log -> logDao.markAsSynced(log.id) }
         } catch (e: Exception) {
             android.util.Log.e("SYNC_ERROR", "Sync failed: ${e.message}")
@@ -103,12 +107,12 @@ class LogRepository @Inject constructor(
     fun getLogsByDate(userId: String, datePrefix: String): Flow<List<LogEntity>> =
         logDao.getLogsByDate(userId, datePrefix)
 
-    private suspend fun saveFileToInternalStorage(uri: Uri, context: Context): String =
+    private suspend fun saveFileToInternalStorage(uri: Uri, context: Context, fallbackExtension: String): String =
         withContext(Dispatchers.IO) {
             val extension = when (context.contentResolver.getType(uri)) {
                 "video/mp4" -> "mp4"
                 "audio/mpeg", "audio/mp3" -> "mp3"
-                else -> "jpg"
+                else -> fallbackExtension
             }
             val fileName = "media_${UUID.randomUUID()}.$extension"
             val file = File(context.filesDir, fileName)

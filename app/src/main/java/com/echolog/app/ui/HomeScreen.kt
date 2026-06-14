@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // Added for remember and getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -13,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.echolog.app.ui.components.HomeLogCard
 import com.echolog.app.viewmodel.LogViewModel
-import com.echolog.app.viewmodel.RegistrationViewModel // Ensure this is imported
+import com.echolog.app.viewmodel.RegistrationViewModel
 import java.time.Instant
 import java.time.LocalTime
 
@@ -41,7 +42,6 @@ fun HomeScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            // Header with Greeting
             item {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Text(
@@ -54,12 +54,10 @@ fun HomeScreen(
                 }
             }
 
-            // Section 1: Upcoming (Filtered logs)
             val upcoming = logs.filter { log ->
-                log.scheduledAt?.let { scheduledStr ->
+                log.scheduledAt?.let { scheduledString ->
                     try {
-                        val scheduledMillis = Instant.parse(scheduledStr).toEpochMilli()
-                        scheduledMillis > System.currentTimeMillis()
+                        scheduledString.toLong() > System.currentTimeMillis()
                     } catch (e: Exception) {
                         false
                     }
@@ -77,11 +75,10 @@ fun HomeScreen(
                     )
                 }
                 items(upcoming) { log ->
-                    HomeLogCard(log)
+                    HomeLogCard(log = log, onClick = {})
                 }
             }
 
-            // Section 2: Recent Memories
             item {
                 Text(
                     "RECENT ACTIVITY",
@@ -105,7 +102,7 @@ fun HomeScreen(
                 }
             } else {
                 items(logs) { log ->
-                    HomeLogCard(log)
+                    HomeLogCard(log = log, onClick = {})
                 }
             }
         }

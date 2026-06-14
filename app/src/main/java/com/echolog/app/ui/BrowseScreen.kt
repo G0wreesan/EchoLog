@@ -5,34 +5,38 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import androidx.compose.ui.window.Dialog
 import com.echolog.app.data.LogEntity
 import com.echolog.app.ui.components.HomeLogCard
-import com.echolog.app.viewmodel.LogViewModel
 import com.echolog.app.ui.components.MediaItemRow
+import com.echolog.app.ui.components.MediaPreviewScreen
+import com.echolog.app.viewmodel.LogViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowseScreen(viewModel: LogViewModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     val logs by viewModel.recentLogs.collectAsState()
 
     var selectedLog by remember { mutableStateOf<LogEntity?>(null) }
-    var showSheet by remember { mutableStateOf(false) }
+    var showModal by remember { mutableStateOf(false) }
 
-    // Edit States
+    var previewMediaUrl by remember { mutableStateOf<String?>(null) }
+
     var isEditing by remember { mutableStateOf(false) }
     var editedCaption by remember { mutableStateOf("") }
     var editedTitle by remember { mutableStateOf("") }
@@ -70,101 +74,174 @@ fun BrowseScreen(viewModel: LogViewModel) {
                     editedCaption = log.caption ?: ""
                     editedTitle = log.title
                     isEditing = false
-                    showSheet = true
+                    showModal = true
                 })
             }
         }
     }
 
-    if (showSheet && selectedLog != null) {
-        ModalBottomSheet(
-            onDismissRequest = { showSheet = false },
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-        ) {
-            // MERGE: Show both unsynced local paths and synced cloud URLs
-            val allMedia = (selectedLog!!.localMediaPaths + selectedLog!!.remoteMediaUrls).distinct()
+    if (showModal && selectedLog != null) {
+        val currentLog = selectedLog!!
 
-            Column(
+        Dialog(
+            onDismissRequest = { showModal = false }
+        ) {
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp)
+                    .wrapContentHeight()
+                    .heightIn(max = 560.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White,
+                tonalElevation = 6.dp
             ) {
-                // --- TOP BAR ---
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                val images = (currentLog.localImagePaths + currentLog.remoteImageUrls).distinct()
+                val audios = (currentLog.localAudioPaths + currentLog.remoteAudioUrls).distinct()
+                val videos = (currentLog.localVideoPaths + currentLog.remoteVideoUrls).distinct()
+                val totalMediaCount = images.size + audios.size + videos.size
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = editedTitle,
+                                onValueChange = { editedTitle = it },
+                                label = { Text("Title") },
+                                modifier = Modifier.weight(1f).padding(end = 8.dp)
+                            )
+                        } else {
+                            Text(
+                                text = currentLog.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Row {
+                            IconButton(onClick = {
+                                if (isEditing) {
+                                    val updatedLog = currentLog.copy(
+                                        title = editedTitle,
+                                        caption = editedCaption
+                                    )
+                                    viewModel.saveAndSyncLog(updatedLog, context)
+                                    selectedLog = updatedLog
+                                }
+                                isEditing = !isEditing
+                            }) {
+                                Icon(if (isEditing) Icons.Default.Check else Icons.Default.Edit, contentDescription = "Edit")
+                            }
+
+                            IconButton(onClick = { showModal = false }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close Dialog")
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Category • ${currentLog.category}",
+                        color = Color(0xCC3FC1FD),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     if (isEditing) {
                         OutlinedTextField(
-                            value = editedTitle,
-                            onValueChange = { editedTitle = it },
-                            label = { Text("Title") }
+                            value = editedCaption,
+                            onValueChange = { editedCaption = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Caption") }
                         )
                     } else {
-                        Text(selectedLog!!.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(currentLog.caption ?: "No description.", color = Color.DarkGray, fontSize = 15.sp)
                     }
 
-                    IconButton(onClick = {
-                        if (isEditing) {
-                            val updatedLog = selectedLog!!.copy(
-                                title = editedTitle,
-                                caption = editedCaption
-                            )
-                            viewModel.saveAndSyncLog(updatedLog, context)
-                        }
-                        isEditing = !isEditing
-                    }) {
-                        Icon(if (isEditing) Icons.Default.Check else Icons.Default.Edit, contentDescription = null)
-                    }
-                }
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                Text("Category • ${selectedLog!!.category}", color = Color(0xCC3FC1FD), style = MaterialTheme.typography.bodySmall)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (isEditing) {
-                    OutlinedTextField(
-                        value = editedCaption,
-                        onValueChange = { editedCaption = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Caption") }
+                    Text(
+                        text = "Media Files ($totalMediaCount)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
                     )
-                } else {
-                    Text(selectedLog!!.caption ?: "No description.", color = Color.DarkGray)
-                }
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // --- MEDIA SECTION ---
-                Text("Media Files (${allMedia.size})", style = MaterialTheme.typography.titleSmall)
-
-                allMedia.forEach { path ->
-                    MediaItemRow(
-                        path = path,
-                        isEditing = isEditing,
-                        onDeleteMedia = {
-                            // Filter the deleted item out of BOTH potential lists
-                            val newLocal = selectedLog!!.localMediaPaths.filter { it != path }
-                            val newRemote = selectedLog!!.remoteMediaUrls.filter { it != path }
-                            selectedLog = selectedLog!!.copy(
-                                localMediaPaths = newLocal,
-                                remoteMediaUrls = newRemote
+                    if (images.isNotEmpty()) {
+                        Text("Photos", style = MaterialTheme.typography.labelMedium, color = Color.Gray, modifier = Modifier.padding(top = 6.dp))
+                        images.forEach { path ->
+                            MediaItemRow(
+                                path = path,
+                                isEditing = isEditing,
+                                onMediaClick = { previewMediaUrl = path },
+                                onDeleteMedia = {
+                                    val updatedLog = currentLog.copy(
+                                        localImagePaths = currentLog.localImagePaths.filter { it != path },
+                                        remoteImageUrls = currentLog.remoteImageUrls.filter { it != path }
+                                    )
+                                    viewModel.saveAndSyncLog(updatedLog, context)
+                                    selectedLog = updatedLog
+                                }
                             )
                         }
-                    )
-                }
+                    }
 
-                if (isEditing) {
-                    Button(
-                        onClick = { /* Launch Camera/Gallery */ },
-                        modifier = Modifier.padding(top = 12.dp).fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xCC3FC1FD))
-                    ) {
-                        Icon(Icons.Default.Add, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Add Media")
+                    if (audios.isNotEmpty()) {
+                        Text("Voice Notes", style = MaterialTheme.typography.labelMedium, color = Color.Gray, modifier = Modifier.padding(top = 6.dp))
+                        audios.forEach { path ->
+                            MediaItemRow(
+                                path = path,
+                                isEditing = isEditing,
+                                onMediaClick = { previewMediaUrl = path },
+                                onDeleteMedia = {
+                                    val updatedLog = currentLog.copy(
+                                        localAudioPaths = currentLog.localAudioPaths.filter { it != path },
+                                        remoteAudioUrls = currentLog.remoteAudioUrls.filter { it != path }
+                                    )
+                                    viewModel.saveAndSyncLog(updatedLog, context)
+                                    selectedLog = updatedLog
+                                }
+                            )
+                        }
+                    }
+
+                    if (videos.isNotEmpty()) {
+                        Text("Videos", style = MaterialTheme.typography.labelMedium, color = Color.Gray, modifier = Modifier.padding(top = 6.dp))
+                        videos.forEach { path ->
+                            MediaItemRow(
+                                path = path,
+                                isEditing = isEditing,
+                                onMediaClick = { previewMediaUrl = path },
+                                onDeleteMedia = {
+                                    val updatedLog = currentLog.copy(
+                                        localVideoPaths = currentLog.localVideoPaths.filter { it != path },
+                                        remoteVideoUrls = currentLog.remoteVideoUrls.filter { it != path }
+                                    )
+                                    viewModel.saveAndSyncLog(updatedLog, context)
+                                    selectedLog = updatedLog
+                                }
+                            )
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    previewMediaUrl?.let { url ->
+        MediaPreviewScreen(
+            mediaPath = url,
+            onDismiss = { previewMediaUrl = null }
+        )
     }
 }

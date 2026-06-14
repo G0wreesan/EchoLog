@@ -5,142 +5,154 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.echolog.app.data.LogEntity
 import com.echolog.app.data.LogRepository
+import com.echolog.app.util.FileStorageHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
-import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LogViewModel @Inject constructor(
     private val repository: LogRepository,
     private val supabase: SupabaseClient
 ) : ViewModel() {
 
-    private val currentUserId: String?
-        get() = supabase.auth.currentUserOrNull()?.id
-
-    private val _userCategories = MutableStateFlow(listOf("Study", "Work", "Workout", "Personal", "Travel", "General"))
-    val userCategories = _userCategories.asStateFlow()
+    private val _userCategories = MutableStateFlow(listOf("General", "Work", "Personal"))
+    val userCategories: StateFlow<List<String>> = _userCategories.asStateFlow()
 
     private val _selectedCalendarDate = MutableStateFlow(LocalDate.now())
-    val selectedCalendarDate = _selectedCalendarDate.asStateFlow()
+    val selectedCalendarDate: StateFlow<LocalDate> = _selectedCalendarDate.asStateFlow()
 
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing = _isSyncing.asStateFlow()
-
-    fun addNewCategory(name: String) {
-        if (!_userCategories.value.contains(name)) {
-            _userCategories.value = _userCategories.value + name
+    private val userIdFlow: Flow<String> = supabase.auth.sessionStatus.map { status ->
+        when (status) {
+            is SessionStatus.Authenticated -> status.session.user?.id ?: "anonymous"
+            else -> "anonymous"
         }
-    }
+    }.distinctUntilChanged()
 
-    // Explicitly typed flatMapLatest to avoid inference errors
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val recentLogs: StateFlow<List<LogEntity>> = supabase.auth.sessionStatus
-        .flatMapLatest { status: SessionStatus ->
-            if (status is SessionStatus.Authenticated) {
-                val userId = status.session.user?.id ?: ""
-                repository.getLogsForUser(userId)
-            } else {
-                flowOf(emptyList<LogEntity>()) // Explicitly provide type
+    val recentLogs: StateFlow<List<LogEntity>> = userIdFlow.flatMapLatest { userId ->
+        repository.getLogsForUser(userId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val calendarLogs: StateFlow<List<LogEntity>> = combine(
+        recentLogs,
+        _selectedCalendarDate
+    ) { logs, date ->
+        logs.filter { log ->
+            try {
+                val logDate = java.time.Instant.parse(log.createdAt)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate()
+                logDate == date
+            } catch (e: Exception) {
+                false
             }
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<LogEntity>())
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _saveFinished = MutableSharedFlow<Boolean>()
+    val saveFinished = _saveFinished.asSharedFlow()
+
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
     fun updateSelectedDate(date: LocalDate) {
         _selectedCalendarDate.value = date
     }
 
-    // Explicitly typed flatMapLatest for Calendar logs
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val calendarLogs: StateFlow<List<LogEntity>> = _selectedCalendarDate
-        .flatMapLatest { date: LocalDate ->
-            val userId = currentUserId
-            if (userId != null) {
-                repository.getLogsByDate(userId, date.toString())
-            } else {
-                flowOf(emptyList<LogEntity>()) // Explicitly provide type
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    fun saveNewLog(
-        title: String,
-        caption: String,
-        category: String,
-        type: String,
-        mediaPaths: List<String>,
-        colorHex: String = "#000000",
-        scheduledAt: Long? = null,
-        context: Context
-    ) {
-        val userId = currentUserId ?: return
-
-        val isoScheduledAt = scheduledAt?.let {
-            Instant.ofEpochMilli(it).toString()
-        }
-
-        viewModelScope.launch {
-            val newLog = LogEntity(
-                userId = userId,
-                title = title,
-                caption = caption,
-                category = category,
-                logType = type,
-                localMediaPaths = mediaPaths,
-                scheduledAt = isoScheduledAt,
-                createdAt = Instant.now().toString(),
-                isSynced = false,
-                colorHex = colorHex
-            )
-            repository.saveAndSyncLog(newLog, context)
-        }
-    }
-    fun saveAndSyncLog(log: LogEntity, context: Context) {
-        viewModelScope.launch {
-            // This ensures that when you edit a caption or add a photo in BrowseScreen,
-            // it goes through the full Media + Database pipeline.
-            repository.saveAndSyncLog(log, context)
-        }
-    }
-
-    fun syncLocalLogsToSupabase() {
+    fun syncLocalLogsToSupabase(context: Context) {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                val unsyncedLogs = repository.getUnsyncedLogs()
-                if (unsyncedLogs.isNotEmpty()) {
-                    supabase.postgrest.from("logs").upsert(unsyncedLogs)
-                    unsyncedLogs.forEach { log ->
-                        repository.updateSyncStatus(log.id, true)
-                    }
-                }
+                repository.syncPendingLogs()
             } catch (e: Exception) {
-                android.util.Log.e("LogViewModel", "Sync Error: ${e.localizedMessage}")
+                e.printStackTrace()
             } finally {
                 _isSyncing.value = false
             }
         }
     }
 
-    fun syncPending() {
+    fun addNewCategory(category: String) {
+        if (category.isNotBlank() && !_userCategories.value.contains(category)) {
+            _userCategories.value = _userCategories.value + category
+        }
+    }
+
+    fun saveAndSyncLog(log: LogEntity, context: Context) {
         viewModelScope.launch {
-            repository.syncPendingLogs()
+            repository.saveAndSyncLog(log, context)
+        }
+    }
+
+    /**
+     * Processes and stores a log entry on a background thread.
+     */
+    fun saveNewLogCategorized(
+        title: String,
+        caption: String,
+        category: String,
+        imagePaths: List<String>,
+        audioPaths: List<String>,
+        videoPaths: List<String>,
+        scheduledAt: Long?,
+        context: Context
+    ) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            try {
+                // Move IO operations to a safe context
+                val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    val persistentImages = imagePaths.map { path ->
+                        if (path.contains("/files/media/IMG_")) path
+                        else FileStorageHelper.saveFileToInternalStorage(context, path, "IMG", "jpg")
+                    }
+
+                    val persistentAudios = audioPaths.map { path ->
+                        if (path.contains("/files/media/VOICE_")) path
+                        else FileStorageHelper.saveFileToInternalStorage(context, path, "VOICE", "m4a")
+                    }
+
+                    val persistentVideos = videoPaths.map { path ->
+                        if (path.contains("/files/media/VID_")) path
+                        else FileStorageHelper.saveFileToInternalStorage(context, path, "VID", "mp4")
+                    }
+
+                    val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                    val newLog = LogEntity(
+                        userId = userId,
+                        title = title,
+                        caption = caption,
+                        category = category,
+                        logType = "MANUAL",
+                        localImagePaths = persistentImages,
+                        localAudioPaths = persistentAudios,
+                        localVideoPaths = persistentVideos,
+                        scheduledAt = scheduledAt?.toString(),
+                        createdAt = java.time.Instant.now().toString()
+                    )
+
+                    repository.saveAndSyncLog(newLog, context)
+                    true
+                }
+                if (result) {
+                    _saveFinished.emit(true)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isSaving.value = false
+            }
         }
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.echolog.app.data.LogEntity
 import com.echolog.app.ui.components.HomeLogCard
 import com.echolog.app.viewmodel.LogViewModel
 import java.time.LocalDate
@@ -37,12 +38,9 @@ fun CalendarScreen(
 
     val yearMonth = YearMonth.from(selectedDate)
     val daysInMonth = yearMonth.lengthOfMonth()
-
-    // Calculate the day of the week for the 1st of the month (0=Sunday, 1=Monday...)
     val firstOfMonth = yearMonth.atDay(1).dayOfWeek.value % 7
 
     Column(modifier = Modifier.fillMaxSize().background(Color.White).padding(16.dp)) {
-        // Month Header
         Text(
             text = "${yearMonth.month.name} ${yearMonth.year}",
             style = MaterialTheme.typography.headlineMedium,
@@ -52,17 +50,14 @@ fun CalendarScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Simple Calendar Grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
             modifier = Modifier.height(280.dp)
         ) {
-            // Empty spaces for days before the 1st of the month
             items(firstOfMonth) {
                 Spacer(Modifier.fillMaxSize())
             }
 
-            // Actual days of the month
             items(daysInMonth) { day ->
                 val date = yearMonth.atDay(day + 1)
                 val isSelected = date == selectedDate
@@ -87,7 +82,6 @@ fun CalendarScreen(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color.LightGray)
 
-        // Enlarged Day View
         Column(modifier = Modifier.weight(1f)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -130,7 +124,7 @@ fun CalendarScreen(
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     items(logsByDate) { log ->
-                        HomeLogCard(log)
+                        HomeLogCard(log = log, onClick = {})
                     }
                 }
             }

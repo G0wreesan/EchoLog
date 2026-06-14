@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Profile(
-    val id: String, // This will be the Supabase User UID
+    val id: String, //  Supabase User UID
     val username: String,
     val display_name: String,
     val email: String,
