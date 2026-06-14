@@ -66,6 +66,13 @@ class LogViewModel @Inject constructor(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
+    private val _navigatedLogId = MutableStateFlow<String?>(null)
+    val navigatedLogId: StateFlow<String?> = _navigatedLogId.asStateFlow()
+
+    fun navigateToLog(logId: String?) {
+        _navigatedLogId.value = logId
+    }
+
     fun updateSelectedDate(date: LocalDate) {
         _selectedCalendarDate.value = date
     }

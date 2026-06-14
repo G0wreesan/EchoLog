@@ -75,7 +75,9 @@ fun HomeScreen(
                     )
                 }
                 items(upcoming) { log ->
-                    HomeLogCard(log = log, onClick = {})
+                    HomeLogCard(log = log, onClick = {
+                        viewModel.navigateToLog(log.id)
+                    })
                 }
             }
 
@@ -102,7 +104,9 @@ fun HomeScreen(
                 }
             } else {
                 items(logs) { log ->
-                    HomeLogCard(log = log, onClick = {})
+                    HomeLogCard(log = log, onClick = {
+                        viewModel.navigateToLog(log.id)
+                    })
                 }
             }
         }

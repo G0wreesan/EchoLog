@@ -28,6 +28,13 @@ fun MainAppShell(
     onLogout: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    val navigatedLogId by logViewModel.navigatedLogId.collectAsState()
+
+    LaunchedEffect(navigatedLogId) {
+        if (navigatedLogId != null) {
+            selectedTab = 3
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xCC3FC1FD),

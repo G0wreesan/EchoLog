@@ -34,12 +34,26 @@ fun BrowseScreen(viewModel: LogViewModel) {
 
     var selectedLog by remember { mutableStateOf<LogEntity?>(null) }
     var showModal by remember { mutableStateOf(false) }
-
-    var previewMediaUrl by remember { mutableStateOf<String?>(null) }
-
     var isEditing by remember { mutableStateOf(false) }
     var editedCaption by remember { mutableStateOf("") }
     var editedTitle by remember { mutableStateOf("") }
+    var previewMediaUrl by remember { mutableStateOf<String?>(null) }
+
+    val navigatedLogId by viewModel.navigatedLogId.collectAsState()
+
+    LaunchedEffect(navigatedLogId, logs) {
+        if (navigatedLogId != null) {
+            val log = logs.find { it.id == navigatedLogId }
+            if (log != null) {
+                selectedLog = log
+                editedCaption = log.caption ?: ""
+                editedTitle = log.title
+                isEditing = false
+                showModal = true
+                viewModel.navigateToLog(null) // Reset after opening
+            }
+        }
+    }
 
     val filteredLogs = logs.filter {
         it.title.contains(searchQuery, ignoreCase = true) ||
