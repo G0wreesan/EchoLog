@@ -41,6 +41,18 @@ class LogViewModel @Inject constructor(
         repository.getLogsForUser(userId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val datesWithLogs: StateFlow<Set<LocalDate>> = recentLogs.map { logs ->
+        logs.mapNotNull { log ->
+            try {
+                java.time.Instant.parse(log.createdAt)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate()
+            } catch (e: Exception) {
+                null
+            }
+        }.toSet()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
     val calendarLogs: StateFlow<List<LogEntity>> = combine(
         recentLogs,
         _selectedCalendarDate

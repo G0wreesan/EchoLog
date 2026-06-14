@@ -119,12 +119,151 @@ fun VaultScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = { logViewModel.syncLocalLogsToSupabase(context) },
-            enabled = !isSyncing,
-            modifier = Modifier.fillMaxWidth()
+        // Profile Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
         ) {
-            Text(if (isSyncing) "Syncing Data..." else "Sync Now")
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val avatarUrl = userProfile?.avatar_url
+                if (avatarUrl != null && avatarUrl.startsWith("http")) {
+                    coil3.compose.AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier.size(64.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.size(64.dp).background(Color(0xCC3FC1FD), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = userProfile?.display_name ?: "Echo User",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = userProfile?.email ?: "No email",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                IconButton(onClick = {
+                    newDisplayName = userProfile?.display_name ?: ""
+                    showEditProfile = true
+                }) {
+                    Icon(Icons.Default.Edit, null, tint = Color(0xCC3FC1FD))
+                }
+            }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Actions", fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Sync Now Button
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable(enabled = !isSyncing) {
+                logViewModel.syncLocalLogsToSupabase(context)
+            },
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFFF5F5F5)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Sync, null, tint = if (isSyncing) Color.Gray else Color.Black)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = if (isSyncing) "Syncing..." else "Sync Now",
+                    fontWeight = FontWeight.Medium,
+                    color = if (isSyncing) Color.Gray else Color.Black
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (isSyncing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xCC3FC1FD))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Support Button
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable { showSupport = true },
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFFF5F5F5)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.HelpOutline, null, tint = Color.Black)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("App Support", fontWeight = FontWeight.Medium)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Logout Button
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable { onLogout() },
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFFFFEBEE)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color.Red)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("Logout", fontWeight = FontWeight.Medium, color = Color.Red)
+            }
+        }
+    }
+
+    if (showEditProfile) {
+        AlertDialog(
+            onDismissRequest = { showEditProfile = false },
+            title = { Text("Edit Display Name") },
+            text = {
+                OutlinedTextField(
+                    value = newDisplayName,
+                    onValueChange = { newDisplayName = it },
+                    placeholder = { Text(userProfile?.display_name ?: "Enter name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newDisplayName.isNotBlank()) {
+                        viewModel.updateDisplayName(newDisplayName)
+                    }
+                    showEditProfile = false
+                }) { Text("Save", color = Color(0xCC3FC1FD)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfile = false }) { Text("Cancel") }
+            }
+        )
     }
 }

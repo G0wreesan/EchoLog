@@ -35,6 +35,7 @@ fun CalendarScreen(
 ) {
     val selectedDate by viewModel.selectedCalendarDate.collectAsState()
     val logsByDate by viewModel.calendarLogs.collectAsState()
+    val datesWithLogs by viewModel.datesWithLogs.collectAsState()
 
     val yearMonth = YearMonth.from(selectedDate)
     val daysInMonth = yearMonth.lengthOfMonth()
@@ -61,6 +62,7 @@ fun CalendarScreen(
             items(daysInMonth) { day ->
                 val date = yearMonth.atDay(day + 1)
                 val isSelected = date == selectedDate
+                val hasLogs = datesWithLogs.contains(date)
 
                 Box(
                     modifier = Modifier
@@ -71,11 +73,21 @@ fun CalendarScreen(
                         .clickable { viewModel.updateSelectedDate(date) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = (day + 1).toString(),
-                        color = if (isSelected) Color.White else Color.Black,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = (day + 1).toString(),
+                            color = if (isSelected) Color.White else Color.Black,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                        if (hasLogs) {
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) Color.White else Color(0xCC3FC1FD))
+                            )
+                        }
+                    }
                 }
             }
         }

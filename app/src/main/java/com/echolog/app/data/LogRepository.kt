@@ -9,6 +9,7 @@ import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import com.echolog.app.util.ReminderScheduler
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -49,7 +50,10 @@ class LogRepository @Inject constructor(
                 // 3. Save locally to Room database
                 logDao.insertLog(logToSave)
 
-                // 4. Upsert to Supabase Postgrest if not anonymous
+                // 4. Schedule reminder if needed
+                ReminderScheduler.scheduleReminder(context, logToSave)
+
+                // 5. Upsert to Supabase Postgrest if not anonymous
                 if (currentUserId != "anonymous") {
                     try {
                         postgrest.from("logs").upsert(logToSave.toRemote())
