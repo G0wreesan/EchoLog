@@ -42,14 +42,22 @@ class LogViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val datesWithLogs: StateFlow<Set<LocalDate>> = recentLogs.map { logs ->
-        logs.mapNotNull { log ->
+        logs.flatMap { log ->
+            val dates = mutableListOf<LocalDate>()
             try {
-                java.time.Instant.parse(log.createdAt)
+                dates.add(java.time.Instant.parse(log.createdAt)
                     .atZone(java.time.ZoneId.systemDefault())
-                    .toLocalDate()
-            } catch (e: Exception) {
-                null
+                    .toLocalDate())
+            } catch (e: Exception) {}
+            
+            log.scheduledAt?.toLongOrNull()?.let {
+                try {
+                    dates.add(java.time.Instant.ofEpochMilli(it)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate())
+                } catch (e: Exception) {}
             }
+            dates
         }.toSet()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
@@ -62,12 +70,19 @@ class LogViewModel @Inject constructor(
                 val logDate = java.time.Instant.parse(log.createdAt)
                     .atZone(java.time.ZoneId.systemDefault())
                     .toLocalDate()
-                logDate == date
+                
+                val scheduledDate = log.scheduledAt?.toLongOrNull()?.let {
+                    java.time.Instant.ofEpochMilli(it)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate()
+                }
+
+                logDate == date || scheduledDate == date
             } catch (e: Exception) {
                 false
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<LogEntity>())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
@@ -148,6 +163,20 @@ class LogViewModel @Inject constructor(
                     }
 
                     val userId = supabase.auth.currentUserOrNull()?.id ?: "anonymous"
+                    
+                    val selectedDate = _selectedCalendarDate.value
+                    val now = java.time.Instant.now()
+                    val nowZoned = now.atZone(java.time.ZoneId.systemDefault())
+                    
+                    // If a past date is selected in the calendar, backdate the creation timestamp
+                    val creationInstant = if (selectedDate.isBefore(nowZoned.toLocalDate())) {
+                        selectedDate.atTime(nowZoned.toLocalTime())
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toInstant()
+                    } else {
+                        now
+                    }
+
                     val newLog = LogEntity(
                         userId = userId,
                         title = title,
@@ -158,7 +187,7 @@ class LogViewModel @Inject constructor(
                         localAudioPaths = persistentAudios,
                         localVideoPaths = persistentVideos,
                         scheduledAt = scheduledAt?.toString(),
-                        createdAt = java.time.Instant.now().toString()
+                        createdAt = creationInstant.toString()
                     )
 
                     repository.saveAndSyncLog(newLog, context)

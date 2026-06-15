@@ -6,9 +6,13 @@ import android.content.Context
 import android.content.Intent
 import com.echolog.app.data.LogEntity
 import com.echolog.app.receiver.ReminderReceiver
+import java.util.Calendar
 
 object ReminderScheduler {
     fun scheduleReminder(context: Context, log: LogEntity) {
+        val prefs = PreferenceManager(context)
+        if (!prefs.notificationsEnabled) return
+
         val scheduledTime = log.scheduledAt?.toLongOrNull() ?: return
         if (scheduledTime <= System.currentTimeMillis()) return
 
@@ -33,13 +37,45 @@ object ReminderScheduler {
                 pendingIntent
             )
         } catch (e: SecurityException) {
-            // Fallback for when exact alarms are not permitted
             alarmManager.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 scheduledTime,
                 pendingIntent
             )
         }
+    }
+
+    fun scheduleDailyDigest(context: Context) {
+        val prefs = PreferenceManager(context)
+        if (!prefs.notificationsEnabled) return
+
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, ReminderReceiver::class.java).apply {
+            putExtra("type", "DIGEST")
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            9999,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val calendar = Calendar.getInstance().apply {
+            val parts = prefs.digestTime.split(":")
+            set(Calendar.HOUR_OF_DAY, parts[0].toInt())
+            set(Calendar.MINUTE, parts[1].toInt())
+            set(Calendar.SECOND, 0)
+            if (timeInMillis <= System.currentTimeMillis()) {
+                add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            calendar.timeInMillis,
+            pendingIntent
+        )
     }
 
     fun cancelReminder(context: Context, logId: String) {

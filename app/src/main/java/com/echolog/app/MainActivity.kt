@@ -32,6 +32,21 @@ class MainActivity : ComponentActivity() {
                     if (user != null) {
                         currentFlow = "MAIN"
                     }
+                    
+                    intent.getStringExtra("navigatedLogId")?.let {
+                        logViewModel.navigateToLog(it)
+                    }
+                }
+
+                // Handle deep links when activity is already running
+                DisposableEffect(Unit) {
+                    val listener = androidx.core.util.Consumer<android.content.Intent> { intent ->
+                        intent.getStringExtra("navigatedLogId")?.let {
+                            logViewModel.navigateToLog(it)
+                        }
+                    }
+                    addOnNewIntentListener(listener)
+                    onDispose { removeOnNewIntentListener(listener) }
                 }
 
                 BackHandler(enabled = currentFlow != "LOGIN" && currentFlow != "MAIN") {

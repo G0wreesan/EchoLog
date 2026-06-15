@@ -248,6 +248,43 @@ class RegistrationViewModel @Inject constructor(
         }
     }
 
+    fun updateAvatar(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            _isChecking.value = true
+            try {
+                val user = supabase.auth.currentUserOrNull() ?: throw Exception("No Auth User")
+                var finalAvatarUrl: String? = null
+
+                if (_selectedBitmap.value != null) {
+                    val stream = ByteArrayOutputStream()
+                    _selectedBitmap.value!!.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    val fileName = "${user.id}_avatar_${System.currentTimeMillis()}.jpg"
+                    val bucket = supabase.storage.from("avatars")
+                    bucket.upload(fileName, stream.toByteArray()) { upsert = true }
+                    finalAvatarUrl = bucket.publicUrl(fileName)
+                } else if (_selectedAvatarRes.value != null) {
+                    finalAvatarUrl = "local_res_${_selectedAvatarRes.value}"
+                }
+
+                if (finalAvatarUrl != null) {
+                    supabase.postgrest.from("profiles").update({
+                        set("avatar_url", finalAvatarUrl)
+                    }) {
+                        filter { eq("id", user.id) }
+                    }
+                    fetchUserProfile()
+                }
+                onComplete()
+            } catch (e: Exception) {
+                _authError.value = "Avatar update failed: ${e.localizedMessage}"
+            } finally {
+                _isChecking.value = false
+                _selectedBitmap.value = null
+                _selectedAvatarRes.value = null
+            }
+        }
+    }
+
     fun logout() {
         viewModelScope.launch {
             supabase.auth.signOut()

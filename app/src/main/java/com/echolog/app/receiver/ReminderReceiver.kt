@@ -10,14 +10,29 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.echolog.app.MainActivity
 import com.echolog.app.R
+import com.echolog.app.util.PreferenceManager
+import com.echolog.app.util.ReminderScheduler
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val title = intent.getStringExtra("title") ?: "Reminder"
-        val caption = intent.getStringExtra("caption") ?: "You have a scheduled log entry."
-        val logId = intent.getStringExtra("logId")
+        val prefs = PreferenceManager(context)
+        if (!prefs.notificationsEnabled) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancelAll()
+            return
+        }
 
-        showNotification(context, title, caption, logId)
+        val type = intent.getStringExtra("type")
+        if (type == "DIGEST") {
+            showNotification(context, "Today's Memories", "Tap to see all logs assigned for today.", null)
+            // Reschedule for tomorrow
+            ReminderScheduler.scheduleDailyDigest(context)
+        } else {
+            val title = intent.getStringExtra("title") ?: "Reminder"
+            val caption = intent.getStringExtra("caption") ?: "You have a scheduled log entry."
+            val logId = intent.getStringExtra("logId")
+            showNotification(context, title, caption, logId)
+        }
     }
 
     private fun showNotification(context: Context, title: String, caption: String, logId: String?) {
@@ -35,18 +50,23 @@ class ReminderReceiver : BroadcastReceiver() {
 
         val activityIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("navigatedLogId", logId)
+            if (logId != null) {
+                putExtra("navigatedLogId", logId)
+            } else {
+                // For digest, we can navigate to Browse screen with today's date selected
+                putExtra("navigate_to", "BROWSE")
+            }
         }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            logId?.hashCode() ?: 0,
+            logId?.hashCode() ?: 9999,
             activityIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Replace with app icon later
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(caption)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -54,6 +74,6 @@ class ReminderReceiver : BroadcastReceiver() {
             .setContentIntent(pendingIntent)
             .build()
 
-        notificationManager.notify(logId?.hashCode() ?: 0, notification)
+        notificationManager.notify(logId?.hashCode() ?: 9999, notification)
     }
 }
